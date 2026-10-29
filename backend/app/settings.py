@@ -25,7 +25,6 @@ DATA_DIR = Path(os.environ.get("DATA_DIR", BACKEND_DIR.parent / "data")).resolve
 
 ASSETS_DIR = DATA_DIR / "assets"
 YOUTUBE_DIR = DATA_DIR / "youtube"
-WORDPRESS_DIR = DATA_DIR / "wordpress"
 
 
 def relative(path: Path) -> str:

@@ -38,8 +38,6 @@ def init_session_state() -> None:
         # so a refresh reopens them.
         'search_id': None,
         'selected_channel': None,
-        # --- WordPress ---
-        'wordpress_job': None,
     }
     for key, default_value in defaults.items():
         if key not in st.session_state:

@@ -5,13 +5,12 @@ search), so that work never runs inside a request. It goes to a thread pool
 instead: once :func:`submit` returns, the job runs to the end and writes its
 result to disk whether or not anyone is still polling for it.
 
-Each kind of job gets its own pool, so a long WordPress run never queues an
-image render behind it, and the pool size is the concurrency cap for that kind:
+Each kind of job gets its own pool, so a long search never queues an image
+render behind it, and the pool size is the concurrency cap for that kind:
 
 - ``asset``     - 4 workers. Several generations can run at once, but not an
   unbounded number of paid calls.
 - ``youtube``   - 2 workers. Searches are quota, not money.
-- ``wordpress`` - 1 worker. Both WordPress jobs append to the same files.
 
 The pool threads are non-daemon on purpose - shutting the server down waits for
 an in-flight render rather than discarding one that has already been paid for.
@@ -35,7 +34,6 @@ JobFn = Callable[[Callable[[str], None]], Any]
 _POOLS: Dict[str, ThreadPoolExecutor] = {
     "asset": ThreadPoolExecutor(max_workers=4, thread_name_prefix="asset"),
     "youtube": ThreadPoolExecutor(max_workers=2, thread_name_prefix="youtube"),
-    "wordpress": ThreadPoolExecutor(max_workers=1, thread_name_prefix="wordpress"),
 }
 
 #: Finished jobs kept for polling. Older ones are dropped first.

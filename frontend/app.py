@@ -1,4 +1,4 @@
-"""Marketing Tools - one Streamlit app over the backend API.
+"""Creative AI Tools - one Streamlit app over the backend API.
 
 Run from the frontend directory, with the backend already running:
 
@@ -13,7 +13,7 @@ import streamlit as st
 import api
 from shared.state import init_session_state
 
-st.set_page_config(page_title="Marketing Tools", page_icon="🧰", layout="wide")
+st.set_page_config(page_title="Creative AI Tools", page_icon="🧰", layout="wide")
 init_session_state()
 
 pages = {
@@ -26,9 +26,6 @@ pages = {
         st.Page("views/youtube/search.py", title="Creator Discovery", icon="🔍"),
         st.Page("views/youtube/results.py", title="Results", icon="📊"),
         st.Page("views/youtube/creator.py", title="Creator", icon="👤"),
-    ],
-    "WordPress": [
-        st.Page("views/wordpress/wordpress.py", title="Content Tagging", icon="🏷️"),
     ],
 }
 

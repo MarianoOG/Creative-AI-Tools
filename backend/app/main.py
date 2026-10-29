@@ -1,4 +1,4 @@
-"""Marketing Tools API - all the logic behind the Streamlit frontend.
+"""Creative AI Tools API - all the logic behind the Streamlit frontend.
 
 Run locally from ``backend/``:
 
@@ -16,15 +16,14 @@ from fastapi import FastAPI
 
 from app import jobs
 from app.assets.worlds import ensure_migrated
-from app.routers import assets, jobs as jobs_router, wordpress, worlds, youtube
+from app.routers import assets, jobs as jobs_router, worlds, youtube
 from app.settings import ASSETS_DIR
 
 TAGS = [
     {"name": "assets", "description": "Browse, generate, move and delete character, object, location and scene images."},
     {"name": "worlds", "description": "The settings assets are grouped into."},
-    {"name": "jobs", "description": "Follow background generations, searches and WordPress runs."},
+    {"name": "jobs", "description": "Follow background generations and searches."},
     {"name": "youtube", "description": "Creator Discovery: find YouTube creators for partnerships."},
-    {"name": "wordpress", "description": "Classify site posts with an LLM and write categories back."},
 ]
 
 
@@ -39,8 +38,8 @@ async def lifespan(app: FastAPI):
     jobs.shutdown()
 
 
-app = FastAPI(title="Marketing Tools API", openapi_tags=TAGS, lifespan=lifespan)
-for module in (assets, worlds, jobs_router, youtube, wordpress):
+app = FastAPI(title="Creative AI Tools API", openapi_tags=TAGS, lifespan=lifespan)
+for module in (assets, worlds, jobs_router, youtube):
     app.include_router(module.router)
 
 

@@ -1,5 +1,5 @@
-"""Background jobs of every kind: poll these to follow a generation, a search or
-a WordPress run that was started elsewhere."""
+"""Background jobs of every kind: poll these to follow a generation or a search
+that was started elsewhere."""
 
 from __future__ import annotations
 
