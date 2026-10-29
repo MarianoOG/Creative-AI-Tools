@@ -2,6 +2,9 @@
 
 Find YouTube creators for collaboration opportunities — promotions, appearances, sponsorships, and partnerships.
 
+> This tool is slated to move out of this repository into a separate, standalone
+> tool.
+
 ## The Problem
 
 Finding the right creators to partner with is time-consuming. Subscriber counts alone don't tell the full story. A channel with 50K subscribers but poor engagement is less valuable than one with 10K subscribers whose videos consistently reach their audience. Manual research across dozens of channels takes hours.

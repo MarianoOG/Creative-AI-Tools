@@ -1,6 +1,8 @@
-# Marketing Tools
+# Creative AI Tools
 
-A collection of marketing automation tools. Each subdirectory is a standalone project.
+Creative AI tools for visual media — images and video: generating assets and
+analysing visual media. Asset generation (worlds, prompts, library) is the core.
+The YouTube tool is slated to move out into a separate, standalone tool.
 
 ## Project Structure
 
@@ -10,16 +12,15 @@ reads and writes it, the frontend mounts it read-only and opens the relative
 paths the API returns.
 
 ```text
-Marketing Tools/
+Creative AI Tools/
 ├── backend/                  # FastAPI service (all logic)
 │   ├── app/
 │   │   ├── main.py           # App, lifespan, router registration, OpenAPI tags
 │   │   ├── settings.py       # DATA_DIR, .env loading, relative/resolve helpers
-│   │   ├── jobs.py           # Background job registry (asset/youtube/wordpress pools)
-│   │   ├── routers/          # One router per tag: assets, worlds, jobs, youtube, wordpress
+│   │   ├── jobs.py           # Background job registry (asset/youtube pools)
+│   │   ├── routers/          # One router per tag: assets, worlds, jobs, youtube
 │   │   ├── assets/           # Generation, prompts, library scan, worlds
-│   │   ├── youtube/          # YouTube API, search pipeline, metrics, saved searches
-│   │   └── wordpress/        # Sitemap analysis and category updates
+│   │   └── youtube/          # YouTube API, search pipeline, metrics, saved searches
 │   ├── requirements.txt
 │   ├── Dockerfile
 │   └── .env                  # API keys (see .env.example)
@@ -27,10 +28,10 @@ Marketing Tools/
 │   ├── app.py                # st.navigation entry point
 │   ├── api.py                # The only module that calls the backend
 │   ├── shared/               # Session state, world switcher, job tracking, YouTube filters
-│   ├── views/                # assets/, youtube/, wordpress/ pages
+│   ├── views/                # assets/, youtube/ pages
 │   ├── requirements.txt
 │   └── Dockerfile
-├── data/                     # Shared, gitignored: assets/, youtube/, wordpress/
+├── data/                     # Shared, gitignored: assets/, youtube/
 ├── docker-compose.yml
 └── .venv/                    # Shared Python 3.12 virtual environment
 ```

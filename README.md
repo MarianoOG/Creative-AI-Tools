@@ -1,12 +1,14 @@
-# Marketing Tools
+# Creative AI Tools
 
-Marketing automation tools behind one UI:
+Creative AI tools for visual media — images and video — behind one UI: generating
+assets, and analysing visual media.
 
-- **Assets** — generate characters, objects, locations and scenes with OpenAI and
-  Gemini, and organise them into worlds. See `backend/app/assets/README.md`.
-- **YouTube** — Creator Discovery, to find creators for partnerships. See
-  `backend/app/youtube/README.md`.
-- **WordPress** — classify a site's posts with an LLM and write categories back.
+- **Assets** (the core) — generate characters, objects, locations and scenes with
+  OpenAI and Gemini, and organise them into worlds. See
+  `backend/app/assets/README.md`.
+- **YouTube** — Creator Discovery, for researching channels and their videos. See
+  `backend/app/youtube/README.md`. Slated to move out into a separate,
+  standalone tool.
 
 ## Architecture
 
@@ -18,9 +20,8 @@ Two services that share one `data/` folder:
 | `frontend/` (Streamlit) | The UI, calling the backend over HTTP | read-only |
 
 The backend returns file paths relative to `data/`, and the frontend opens them
-from its own read-only mount. Long work (image renders, YouTube searches,
-WordPress runs) runs as background jobs in the backend, so leaving a page never
-cancels it. API docs, grouped by tag, are at http://localhost:8000/docs.
+from its own read-only mount. Long work (image renders, YouTube searches)
+runs as background jobs in the backend, so leaving a page never cancels it. API docs, grouped by tag, are at http://localhost:8000/docs.
 
 ## Run with Docker
 
