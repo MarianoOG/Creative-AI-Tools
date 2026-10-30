@@ -26,17 +26,13 @@ def render_form(options: Dict) -> Dict:
     scene = asset_type == "scene"
     name = st.text_input(
         "Name",
-        placeholder="fox_hero",
+        placeholder="asset_name",
         help="Used for the filename. Spaces and punctuation become underscores.",
         key='asset_name',
     )
     description = st.text_area(
         "Description",
-        placeholder=(
-            "the fox hero holds the lantern up in the night market"
-            if scene
-            else "a lanky fox in a patched wool coat, tall ears, tired eyes"
-        ),
+        placeholder=("asset_description"),
         help="The situation to depict." if scene else "The subject to design.",
         height=120,
         key='asset_description',
