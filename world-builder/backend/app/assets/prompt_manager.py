@@ -3,7 +3,9 @@
 A prompt is ``description -> style clause -> framing -> reference clause``.
 Framing comes after the style, so it has the last word on layout and lighting.
 The style clause is the world's style (in ``world.json``); :data:`STYLES` are the presets
-new worlds start from.
+new worlds start from. Storyboard shots use it too, as a quick low detailed
+view drawn from text alone (no reference images) that is about composition and
+lighting.
 """
 
 from __future__ import annotations
@@ -157,13 +159,26 @@ LOCATION_VIEWS: dict[str, str] = {
 _LOCATION_TAIL = "No text, no signage lettering, no watermarks, no borders."
 
 _SHOT_COMPOSITION = (
-    "Render this as a single finished composed frame depicting the situation "
-    "described above. Compose it cinematically with a clear focal subject, a "
-    "readable staging of every element mentioned, and depth between foreground, "
-    "midground and background. Keep the characters, objects and environment "
-    "exactly consistent with their reference designs. "
+    "Render this as a low detailed view: a single storyboard frame depicting "
+    "the situation described above, in the style above but simplified, with "
+    "broad shapes, little texture and no fine detail, so the frame is about "
+    "composition and lighting only. Compose it like a film frame: choose a "
+    "deliberate camera angle and shot size, frame the subject through "
+    "foreground elements, and give it layered depth and a clear focal point. "
+    "Every character and object mentioned has a readable place in the frame "
+    "and keeps its key identifying features, so it is easy to tell who and "
+    "what is in it. "
 )
-_SHOT_TAIL = "No text, no captions, no borders."
+_SHOT_LIGHTING = (
+    "Light it dramatically: high-contrast light with big masses of shadow, "
+    "silhouettes against bright windows or light sources, and light and shadow "
+    "leading the eye to the focal subject. "
+)
+_SHOT_TAIL = (
+    "Exactly one single frame filling the whole image: no panels, no grid, no "
+    "comic strip, no vignettes, no inset images and no frames within the frame. "
+    "No text, no captions, no speech bubbles, no borders."
+)
 
 #: For line-only styles, where a lighting or colour-grade sentence would contradict the style.
 _MONOCHROME_RENDERING = (
@@ -181,7 +196,7 @@ FRAMING: dict[str, str] = {
     "character": CHARACTER_FRAMING,
     "object": OBJECT_FRAMING,
     "location": _LOCATION_COMPOSITION + "{view}" + _LOCATION_LIGHTING + _LOCATION_TAIL,
-    "shot": _SHOT_COMPOSITION + "Unified lighting and colour grade across the whole frame. " + _SHOT_TAIL,
+    "shot": _SHOT_COMPOSITION + _SHOT_LIGHTING + _SHOT_TAIL,
 }
 
 #: Framings for line-only styles. Matched on the exact preset text, so an edited style gets the default framing.
@@ -192,8 +207,8 @@ MONOCHROME_FRAMING: dict[str, str] = {
 _MONOCHROME_STYLES = {STYLES["ligne_claire_lineart"]}
 
 #: How references are used. New characters, objects and locations take them as
-#: inspiration (never for the style); variations, location views and shots take
-#: them as designs to reproduce.
+#: inspiration (never for the style); variations and location views take them
+#: as designs to reproduce.
 REFERENCE_CLAUSES: dict[str, str] = {
     "character": (
         "Reference images are provided as inspiration, not as something to copy. "
@@ -232,17 +247,6 @@ REFERENCE_CLAUSES: dict[str, str] = {
         "would be found in, matched to their scale and their world. The style is "
         "defined by the style description above and overrides the rendering of the "
         "references."
-    ),
-    "shot": (
-        "Use the attached reference images as the authority for this frame. They "
-        "are fact, not inspiration: reproduce the identity, design, proportions, "
-        "costume, materials and colour palette of every subject they depict "
-        "faithfully and consistently. Do not redesign, restyle, simplify or "
-        "substitute them — a viewer must recognise each one as the same character, "
-        "object and place. Where a reference shows an environment, keep its layout, "
-        "architecture and palette as the setting of this frame. Ignore only the "
-        "sheet layout of the references themselves (the multiple views and the "
-        "blank backdrop); their designs are what carry over."
     ),
     "variation": (
         "The first reference image is the established design of this subject, and "

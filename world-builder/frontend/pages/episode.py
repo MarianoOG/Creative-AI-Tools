@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from html import escape
 from typing import Dict, List
 
 import streamlit as st
@@ -34,7 +33,7 @@ def render_header(world: str, episode: str, script: Dict) -> None:
         aspect_ratio = ratio_col.selectbox(
             "Aspect ratio", ratios, index=ratios.index(script['aspect_ratio']), key=f"ratio_{episode}"
         )
-        st.caption("Every storyboard frame of the episode uses this model and aspect ratio, at low quality.")
+        st.caption("Every storyboard frame of the episode uses this model and aspect ratio, as a quick low detailed view.")
         if st.button("Save", key=f"save_header_{episode}"):
             fields = {'title': title, 'synopsis': synopsis, 'provider': provider, 'aspect_ratio': aspect_ratio}
             save(world, episode, {**script, **fields}, "Saved.")
@@ -47,12 +46,6 @@ def render_header(world: str, episode: str, script: Dict) -> None:
 def render_shots(shots: List[Dict]) -> None:
     for shot in shots:
         st.markdown(f"`{shot['id']}` {shot['action']}")
-        for line in shot['dialogue']:
-            speaker = escape(line['character'].upper() or "—")
-            st.markdown(
-                f"<div style='margin-left:3em'><b>{speaker}</b><br>{escape(line['line'])}</div>",
-                unsafe_allow_html=True,
-            )
 
 
 def render_scene(world: str, episode: str, script: Dict, index: int, names: Dict) -> None:

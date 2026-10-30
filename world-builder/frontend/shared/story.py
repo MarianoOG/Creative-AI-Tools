@@ -1,4 +1,4 @@
-"""Helpers shared by the Episode and Storyboard pages: pickers, the scene editor and dialogue text."""
+"""Helpers shared by the Episode and Storyboard pages: pickers and the scene editor."""
 
 from __future__ import annotations
 
@@ -71,22 +71,6 @@ def scene_fields(scene: Dict, names: Dict[str, List[str]], prefix: str) -> Dict:
             field.capitalize(), options, default=scene[field], format_func=reference_label, key=f"{prefix}{field}"
         )
     return {**scene, 'heading': heading, 'summary': summary, **picks}
-
-
-def dialogue_text(dialogue: List[Dict]) -> str:
-    return "\n".join(f"{d['character']}: {d['line']}" if d['character'] else d['line'] for d in dialogue)
-
-
-def parse_dialogue(text: str) -> List[Dict]:
-    """``character: line``, one per row. A row without a colon is a line with no speaker."""
-    dialogue = []
-    for row in text.splitlines():
-        character, sep, line = row.partition(":")
-        if not sep:
-            character, line = "", row
-        if line.strip():
-            dialogue.append({'character': character.strip(), 'line': line.strip()})
-    return dialogue
 
 
 def references_markdown(scene: Dict) -> str:

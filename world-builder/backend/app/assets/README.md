@@ -114,7 +114,6 @@ scene entry without a folder is dropped on the next save.
     "shots": [{
       "id": "market_night",
       "action": "The fox walks down the wet street, lantern raised.",
-      "dialogue": [{"character": "fox_hero", "line": "Hello? Anyone still open?"}],
       "image": "9c0d1e2f-market_night.png"
     }]
   }]
@@ -134,7 +133,7 @@ changes its description or picks its preferred variation. `POST
 missing views), `POST /assets/regenerate` and
 `POST /worlds/{world}/episodes/{episode}/scenes/{scene}/shots/{shot}/generate`
 wait for the render and return the result. Each image is rendered by one
-`provider` (`openai` or `gemini`).
+`provider` (`openai`, `gemini` or `runware`).
 
 - **style**: always the world's style; generation is refused while it is
   empty. New worlds can start from a preset (`STYLES` in `prompt_manager.py`).
@@ -143,8 +142,10 @@ wait for the render and return the result. Each image is rendered by one
 - **assets**: always landscape (16:9) and high quality. Several renders (a
   location's views, regenerate all) run one after another; if one fails, the
   ones already made are kept and the failure comes back as a `warning`.
-- **shots**: the prompt is the scene heading and summary plus the shot's action
-  (dialogue is never drawn), with the image of each character, location and
-  object reference the scene lists. The model and aspect ratio (`landscape`,
-  `square`, `portrait`) are the episode's, and quality is always low.
+- **shots**: the prompt is the scene heading and summary plus the shot's action,
+  with the description of each character, location and object the scene lists
+  (no images are sent). Every shot is a *low detailed view* in the world's
+  style: simplified, and about composition and lighting only. It renders at low
+  quality and a lower resolution (`SHOT_SIZES` in `generation.py`). The model
+  and aspect ratio (`landscape`, `square`, `portrait`) are the episode's.
   Regenerating points the shot at the new image.

@@ -1,5 +1,6 @@
 fastapi==0.142.4
 google-genai==2.16.0
+httpx==0.28.1
 openai==2.52.0
 pillow==12.0.0
 pydantic==2.13.5

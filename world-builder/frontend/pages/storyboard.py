@@ -1,7 +1,8 @@
 """Storyboard: one scene's shots, each with its one frame and its text, and generation of the missing frames.
 
 Frames use the episode's model and aspect ratio (set on the Episode page), at
-low quality. Regenerating replaces a shot's frame; the old file stays on disk.
+low quality, as a low detailed view in the world's style, drawn from text alone
+(no reference images). Regenerating replaces a shot's frame; the old file stays on disk.
 
 Every change (save, add, delete) first collects what is typed in the widgets,
 so no unsaved edit is lost.
@@ -16,7 +17,7 @@ import streamlit as st
 
 import api
 from shared.state import notify, show_notice
-from shared.story import asset_names, dialogue_text, episode_url, parse_dialogue, pick_episode, scene_fields
+from shared.story import asset_names, episode_url, pick_episode, scene_fields
 from shared.worlds import render_world_switcher
 
 
@@ -39,16 +40,9 @@ def shot_key(prefix: str, shot: Dict, field: str) -> str:
 
 
 def collect(edited: Dict, prefix: str) -> Dict:
-    """The scene as currently typed: ``edited`` scene fields plus every shot's action and dialogue."""
+    """The scene as currently typed: ``edited`` scene fields plus every shot's action."""
     state = st.session_state
-    shots = [
-        {
-            'id': shot['id'],
-            'action': state[shot_key(prefix, shot, 'action')],
-            'dialogue': parse_dialogue(state[shot_key(prefix, shot, 'dialogue')]),
-        }
-        for shot in edited['shots']
-    ]
+    shots = [{'id': shot['id'], 'action': state[shot_key(prefix, shot, 'action')]} for shot in edited['shots']]
     return {**edited, 'shots': shots}
 
 
@@ -89,14 +83,7 @@ def render_shot(shot: Dict, prefix: str, number: int) -> Dict[str, bool]:
             st.info("No frame yet.")
     with text_col:
         st.markdown(f"**{number}.** `{shot['id']}`")
-        st.text_area("Action", value=shot['action'], height=110, key=shot_key(prefix, shot, 'action'))
-        st.text_area(
-            "Dialogue",
-            value=dialogue_text(shot['dialogue']),
-            height=90,
-            key=shot_key(prefix, shot, 'dialogue'),
-            help="One line each, as `character: line`. Dialogue is never drawn into the frame.",
-        )
+        st.text_area("Action", value=shot['action'], height=200, key=shot_key(prefix, shot, 'action'))
         generate_col, delete_col = st.columns(2)
         return {
             'generate': generate_col.button(
@@ -126,7 +113,7 @@ def main() -> None:
 
     provider = api.options()['providers'][script['provider']]
     settings_col, save_col, missing_col = st.columns([2, 1, 1])
-    settings_col.caption(f"Frames: {provider} · {script['aspect_ratio']} · low quality. Change them on the Episode page.")
+    settings_col.caption(f"Frames: {provider} · {script['aspect_ratio']} · low detailed view. Change them on the Episode page.")
     missing = [shot['id'] for shot in scene['shots'] if not shot.get('path')]
     save_clicked = save_col.button("Save storyboard", type="primary", width='stretch')
     missing_clicked = missing_col.button(
@@ -145,7 +132,7 @@ def main() -> None:
     to_generate = missing if missing_clicked else [i for i, a in actions.items() if a['generate']]
     removed = [i for i, a in actions.items() if a['delete']]
     if add_clicked:
-        edited['shots'].append({'id': next_shot_id(edited['shots']), 'action': "", 'dialogue': []})
+        edited['shots'].append({'id': next_shot_id(edited['shots']), 'action': ""})
     if removed:
         edited['shots'] = [shot for shot in edited['shots'] if shot['id'] not in removed]
         for key in [k for k in st.session_state if any(k.startswith(f"{prefix}{i}_") for i in removed)]:

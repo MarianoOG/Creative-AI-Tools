@@ -1,6 +1,7 @@
 # World Builder
 
-Build **worlds** with OpenAI or Gemini. Each world has a `world.json` holding
+Build **worlds** with OpenAI, Gemini or Runware (Flux 2 Klein 4B, the
+cheap and fast default for storyboard frames). Each world has a `world.json` holding
 its visual style and its **characters**, **locations** and **objects** (with
 their variations), and its **episodes**: scenes made of storyboard shots,
 written in a `script.json`.
@@ -22,7 +23,7 @@ works is in `backend/app/assets/README.md`.
 | World | The world's characters, locations and objects (three columns, each shown by its preferred image) and episodes, one tab each. Create assets (a name and a description) and episodes here. Click an image or Edit to open the asset. |
 | Asset | One asset: edit its name and description, and generate, prefer, regenerate (one or all) and delete its variations, or a location's views. |
 | Episode script | The whole episode as text, scene by scene, with each scene's references. Add, edit and delete scenes, and set the episode's model and aspect ratio. |
-| Storyboard | One scene's shots: each frame next to its action and dialogue, generation of the missing frames, and regeneration. |
+| Storyboard | One scene's shots: each frame next to its action, generation of the missing frames, and regeneration. |
 | Manage worlds | Create (from a style preset), rename and delete worlds. |
 
 The sidebar holds the world picker and the world's style, editable in place.

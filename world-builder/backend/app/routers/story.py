@@ -9,9 +9,8 @@ from pydantic import BaseModel
 
 from app.assets import story
 from app.assets.generation import SHOT_QUALITY, generate_image
-from app.assets.library import reference_paths
 from app.assets.prompt_manager import ASSET_DIRS
-from app.assets.worlds import list_worlds, read_style
+from app.assets.worlds import list_worlds, read_style, read_world
 
 router = APIRouter(prefix="/worlds/{world}/episodes", tags=["story"])
 
@@ -89,17 +88,29 @@ def remove_scene(world: str, episode: str, scene: str) -> None:
     _call(story.delete_scene, world, episode, scene)
 
 
-def _reference_label(reference: str, asset_type: str) -> str:
+
+
+def _cast_line(assets: Dict[str, Dict], reference: str, asset_type: str) -> str:
+    """One line of a shot's cast: the asset's name and description, and the variation's change if one is named."""
     name, _, variation = reference.partition(":")
-    return f"{name}, {variation} ({asset_type})" if variation else f"{name} ({asset_type})"
+    asset = assets.get(name, {})
+    parts = [asset.get("description", "").strip()]
+    change = next((v["description"] for v in asset.get("variations", []) if v["name"] == variation), "")
+    if change.strip():
+        parts.append(f"{variation}: {change.strip()}")
+    details = ". ".join(part for part in parts if part)
+    label = f"{name.replace('_', ' ')} ({asset_type})"
+    return f"{label}: {details}" if details else label
 
 
 @router.post("/{episode}/scenes/{scene}/shots/{shot}/generate")
 def generate_shot(world: str, episode: str, scene: str, shot: str) -> Dict:
     """Render a shot's one image, replacing the one it had (whose file stays on disk).
 
-    Uses the episode's provider and aspect ratio, always at low quality, with
-    the images of the characters, locations and objects the scene lists.
+    Uses the episode's provider and aspect ratio and the world's style, always as
+    a low detailed view at low quality and low resolution. No images are sent:
+    the characters, locations and objects the scene lists go in as their
+    descriptions.
     """
     _check_world(world)
     script = _call(story.read_script, world, episode)
@@ -110,15 +121,13 @@ def generate_shot(world: str, episode: str, scene: str, shot: str) -> Dict:
     if shot_data is None:
         raise HTTPException(404, f"no shot called {shot!r} - save the storyboard first")
 
-    names, references = [], []
+    world_data = read_world(world)
+    cast = []
     for asset_type, folder in ASSET_DIRS.items():
-        available = reference_paths(world, asset_type)
-        for reference in scene_data[folder]:
-            if reference in available:
-                names.append(_reference_label(reference, asset_type))
-                references.append(available[reference])
+        assets = {asset["name"]: asset for asset in world_data[folder]}
+        cast += [_cast_line(assets, reference, asset_type) for reference in scene_data[folder]]
 
-    description = story.shot_description(scene_data, shot_data, names)
+    description = story.shot_description(scene_data, shot_data, cast)
     if not description.strip():
         raise HTTPException(422, "Describe the shot (or the scene) before generating it.")
     style = read_style(world)
@@ -133,8 +142,6 @@ def generate_shot(world: str, episode: str, scene: str, shot: str) -> Dict:
             style,
             story.scene_dir(world, episode, scene),
             provider=script["provider"],
-            references=references,
-            clause="shot",
             aspect_ratio=script["aspect_ratio"],
             quality=SHOT_QUALITY,
         )

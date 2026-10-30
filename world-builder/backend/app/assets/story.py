@@ -13,12 +13,11 @@ new file and leaves the old one on disk. The episode's ``provider`` and
 script.json::
 
     {
-      "title": "...", "synopsis": "...", "provider": "openai", "aspect_ratio": "landscape",
+      "title": "...", "synopsis": "...", "provider": "runware", "aspect_ratio": "landscape",
       "scenes": [{
         "id": "scene1", "heading": "INT. KITCHEN - DAY", "summary": "...",
         "characters": ["fox", "fox:older"], "locations": ["kitchen"], "objects": ["lantern"],
-        "shots": [{"id": "shot_1", "action": "...", "dialogue": [{"character": "fox", "line": "..."}],
-                   "image": "1a2b3c4d-shot_1.png"}]
+        "shots": [{"id": "shot_1", "action": "...", "image": "1a2b3c4d-shot_1.png"}]
       }]
     }
 
@@ -32,7 +31,7 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from app.assets.generation import ASPECT_RATIOS, DEFAULT_PROVIDER, PROVIDERS
+from app.assets.generation import ASPECT_RATIOS, DEFAULT_SHOT_PROVIDER, PROVIDERS
 from app.assets.prompt_manager import ASSET_DIRS
 from app.assets.worlds import images_in, legacy_name, move_to_deleted, slugify, subfolders, world_dir
 from app.settings import relative
@@ -81,11 +80,6 @@ def _clean_shot(raw: Dict, folder: Path) -> Dict:
     return {
         "id": shot_id,
         "action": str(raw.get("action", "")),
-        "dialogue": [
-            {"character": str(d.get("character", "")), "line": str(d.get("line", ""))}
-            for d in raw.get("dialogue", [])
-            if str(d.get("line", "")).strip()
-        ],
         "image": Path(str(image)).name if image else None,
     }
 
@@ -118,7 +112,7 @@ def _normalise(world: str, episode: str, raw: Dict) -> Script:
     return {
         "title": str(raw.get("title") or episode),
         "synopsis": str(raw.get("synopsis", "")),
-        "provider": raw.get("provider") if raw.get("provider") in PROVIDERS else DEFAULT_PROVIDER,
+        "provider": raw.get("provider") if raw.get("provider") in PROVIDERS else DEFAULT_SHOT_PROVIDER,
         "aspect_ratio": raw.get("aspect_ratio") if raw.get("aspect_ratio") in ASPECT_RATIOS else "landscape",
         "scenes": [_clean_scene(by_id.get(scene_id, {}), scene_id, directory / scene_id) for scene_id in order],
     }
@@ -228,9 +222,9 @@ def rename_references(world: str, folder: str, old: str, new: str) -> None:
             save_script(world, episode, script)
 
 
-def shot_description(scene: Dict, shot: Dict, reference_names: List[str]) -> str:
-    """What a shot's frame should show. Dialogue is left out: it is never drawn."""
+def shot_description(scene: Dict, shot: Dict, cast: List[str]) -> str:
+    """What a shot's frame should show, with ``cast`` (one line per character, location or object)."""
     lines = [scene["heading"], scene["summary"], shot["action"]]
-    if reference_names:
-        lines.append("The reference images show, in order: " + ", ".join(reference_names) + ".")
+    if cast:
+        lines.append("In this scene:\n" + "\n".join(f"- {line}" for line in cast))
     return "\n".join(line for line in lines if line.strip())
