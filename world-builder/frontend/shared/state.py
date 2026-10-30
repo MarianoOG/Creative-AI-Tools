@@ -12,8 +12,8 @@ def init_session_state() -> None:
         # The episode and scene the Episode and Storyboard pages open on.
         'current_episode': None,
         'current_scene': None,
-        # The asset type the Create page starts on.
-        'create_type': 'character',
+        # The (asset_type, name) the Asset page opens on.
+        'current_asset': None,
         # One-shot (kind, text) message shown after the rerun that caused it.
         'notice': None,
     }

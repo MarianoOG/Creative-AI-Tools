@@ -1,25 +1,31 @@
-"""World: the current world's characters, locations and objects, and its episodes, one tab each."""
+"""World: the current world's characters, locations and objects (each by its preferred image), and its episodes, one tab each."""
 
 from __future__ import annotations
 
-import mimetypes
-from pathlib import Path
-from typing import Dict, List
+import base64
+from io import BytesIO
+from urllib.parse import urlencode
 
 import streamlit as st
+from PIL import Image
 
 import api
 from shared.state import notify, show_notice
 from shared.worlds import render_world_switcher
 
-COLUMNS = 4
+COLUMNS = 3
 ASSET_TABS = {'character': "Characters", 'location': "Locations", 'object': "Objects"}
+THUMBNAIL = (960, 540)
 
 
-@st.cache_data(show_spinner=False, max_entries=32)
-def load_bytes(path: str, mtime: float) -> bytes:
-    """Read an image for download. ``mtime`` is only a cache key. Capped: renders are several MB."""
-    return api.file_path(path).read_bytes()
+@st.cache_data(show_spinner=False, max_entries=256)
+def thumbnail(path: str, mtime: float) -> str:
+    """A small JPEG of an image as a data URI, for the clickable tile. ``mtime`` is only a cache key."""
+    image = Image.open(api.file_path(path)).convert("RGB")
+    image.thumbnail(THUMBNAIL)
+    buffer = BytesIO()
+    image.save(buffer, "JPEG", quality=85)
+    return "data:image/jpeg;base64," + base64.b64encode(buffer.getvalue()).decode()
 
 
 def stay_on(tab: str) -> None:
@@ -27,52 +33,62 @@ def stay_on(tab: str) -> None:
     st.session_state.world_tab = tab
 
 
-def transfer(path: str, target: str, copy: bool) -> None:
-    """Move or duplicate an asset into ``target``, then rerun with the outcome."""
-    outcome = api.post("/assets/transfer", json={'paths': [path], 'target': target, 'copy_assets': copy})
-    if outcome['failed']:
-        notify('warning', "; ".join(outcome['failed']))
-    notify('success', f"{'Duplicated' if copy else 'Moved'} to **{target}**.")
+def open_asset(asset_type: str, name: str) -> None:
+    st.session_state.current_asset = (asset_type, name)
+    st.switch_page("pages/asset.py")
 
 
-def render_tile(asset: Dict, targets: List[str]) -> None:
-    """A thumbnail, and the move, download and delete actions in an expander."""
-    path = asset['path']
-    name = Path(path).name
-    tab = ASSET_TABS[asset['asset_type']]
-    st.image(str(api.file_path(path)), width='stretch')
-    st.caption(asset['label'])
-
-    with st.expander("Details"):
-        st.text(name)
-        if targets:
-            target = st.selectbox("Move or duplicate to", targets, key=f"target_{path}")
-            move_col, copy_col = st.columns(2)
-            if move_col.button("Move", key=f"move_{path}", width='stretch'):
-                stay_on(tab)
-                transfer(path, target, copy=False)
-            if copy_col.button("Duplicate", key=f"copy_{path}", width='stretch'):
-                stay_on(tab)
-                transfer(path, target, copy=True)
-        st.download_button(
-            "Download",
-            data=load_bytes(path, asset['mtime']),
-            file_name=name,
-            mime=mimetypes.guess_type(name)[0] or "image/png",
-            key=f"download_{path}",
-            width='stretch',
+def render_tile(world: str, asset: dict) -> None:
+    """The preferred image (a link to the Asset page), the name, Edit, and the details with Delete."""
+    asset_type, name = asset['asset_type'], asset['name']
+    preferred = next((v for v in asset['variations'] if v['name'] == asset['preferred']), None)
+    if preferred:
+        link = "asset?" + urlencode({'world': world, 'type': asset_type, 'name': name})
+        st.markdown(
+            f'<a href="{link}" target="_self"><img src="{thumbnail(preferred["path"], preferred["mtime"])}" '
+            f'alt="{name}" style="width:100%;border-radius:0.5rem;display:block"></a>',
+            unsafe_allow_html=True,
         )
-        confirmed = st.checkbox("Confirm delete", key=f"confirm_{path}")
-        if st.button("Delete", icon=":material/delete:", disabled=not confirmed, key=f"delete_{path}", width='stretch'):
-            stay_on(tab)
-            api.delete("/assets", path=path)
-            st.rerun()
+    else:
+        st.info("No images yet.")
+    name_col, edit_col = st.columns([3, 1])
+    name_col.markdown(f"**{name}**")
+    if edit_col.button("Edit", key=f"edit_{asset_type}_{name}", width='stretch'):
+        open_asset(asset_type, name)
+    with st.expander("Details"):
+        if asset['description']:
+            st.write(asset['description'])
+        count = len(asset['variations'])
+        st.caption(f"{count} {'view' if asset_type == 'location' else 'variation'}{'s' if count != 1 else ''}"
+                   + (f" · preferred: {asset['preferred']}" if asset['preferred'] else ""))
+        confirmed = st.checkbox("Confirm delete", key=f"confirm_{asset_type}_{name}")
+        if st.button("Delete", icon=":material/delete:", disabled=not confirmed, key=f"delete_{asset_type}_{name}",
+                     width='stretch', help="Removes it from the world. Its image files stay in the data folder."):
+            stay_on(ASSET_TABS[asset_type])
+            api.delete("/assets", world=world, asset_type=asset_type, name=name)
+            notify('success', f"Removed **{name}** from {world}.")
 
 
-def render_assets(world: str, asset_type: str, targets: List[str]) -> None:
-    if st.button(f"Create a {asset_type}", icon=":material/add:", key=f"create_{asset_type}", type="primary"):
-        st.session_state.create_type = asset_type
-        st.switch_page("pages/create.py")
+def render_new_asset(world: str, asset_type: str) -> None:
+    """Create an asset (name and description only) and open it on the Asset page to generate its images."""
+    with st.popover(f"New {asset_type}", icon=":material/add:", type="primary"):
+        name = st.text_input("Name", placeholder=f"{asset_type}_name", key=f"new_name_{asset_type}",
+                             help="Used in scripts. Spaces and punctuation become underscores.")
+        description = st.text_area("Description", key=f"new_description_{asset_type}", height=120)
+        if st.button("Create", disabled=not (name.strip() and description.strip()), key=f"new_go_{asset_type}"):
+            stay_on(ASSET_TABS[asset_type])
+            try:
+                created = api.post("/assets", json={
+                    'world': world, 'asset_type': asset_type, 'name': name, 'description': description,
+                })['asset']
+            except api.ApiError as exc:
+                st.error(str(exc))
+                return
+            open_asset(asset_type, created['name'])
+
+
+def render_assets(world: str, asset_type: str) -> None:
+    render_new_asset(world, asset_type)
     assets = api.get("/assets", world=world, asset_type=asset_type)['assets']
     if not assets:
         st.info(f"No {asset_type}s in {world} yet.")
@@ -80,7 +96,7 @@ def render_assets(world: str, asset_type: str, targets: List[str]) -> None:
     for row_start in range(0, len(assets), COLUMNS):
         for column, asset in zip(st.columns(COLUMNS), assets[row_start:row_start + COLUMNS]):
             with column:
-                render_tile(asset, targets)
+                render_tile(world, asset)
 
 
 def render_episodes(world: str) -> None:
@@ -113,7 +129,7 @@ def render_episodes(world: str) -> None:
         with open_col.popover("Delete", width='stretch'):
             st.warning(
                 f"All {episode['scene_count']} scenes and every shot image in **{episode['name']}** "
-                "will be lost. This cannot be undone."
+                "are removed from the app (the folder is kept, hidden, in the data folder)."
             )
             if st.button("Delete episode", icon=":material/delete:", key=f"delete_episode_{episode['name']}"):
                 stay_on("Episodes")
@@ -122,8 +138,7 @@ def render_episodes(world: str) -> None:
 
 
 def main() -> None:
-    world, payload = render_world_switcher()
-    targets = [entry['name'] for entry in payload['worlds'] if entry['name'] != world]
+    world, _ = render_world_switcher()
 
     st.title(world)
     show_notice()
@@ -132,7 +147,7 @@ def main() -> None:
     *asset_tabs, episodes_tab = st.tabs(tab_names, default=st.session_state.get('world_tab'))
     for tab, asset_type in zip(asset_tabs, ASSET_TABS):
         with tab:
-            render_assets(world, asset_type, targets)
+            render_assets(world, asset_type)
     with episodes_tab:
         render_episodes(world)
 

@@ -1,4 +1,4 @@
-"""The sidebar shared by every page: the world picker and the world's style."""
+"""The sidebar shared by every page (the world picker and the world's style), and the model picker."""
 
 from __future__ import annotations
 
@@ -10,9 +10,9 @@ import api
 
 
 def render_style_editor(world: str) -> None:
-    """Show and edit the world's ``style.txt``, which every generated image in it uses."""
+    """Show and edit the world's style (in ``world.json``), which every generated image in it uses."""
     style = api.get(f"/worlds/{world}/style")['style']
-    st.markdown("**Style** · `style.txt`")
+    st.markdown("**Style**")
     text = st.text_area(
         "Style",
         value=style,
@@ -55,3 +55,12 @@ def render_world_switcher() -> Tuple[str, Dict]:
         render_style_editor(chosen)
 
     return chosen, payload
+
+
+def model_select(options: Dict, key: str, default: str = "") -> str:
+    """The provider picker: one model renders each image."""
+    providers = list(options['providers'])
+    current = default if default in providers else options['default_provider']
+    return st.selectbox(
+        "Model", providers, index=providers.index(current), format_func=options['providers'].get, key=key
+    )

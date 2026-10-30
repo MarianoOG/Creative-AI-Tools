@@ -2,7 +2,7 @@
 
 A prompt is ``description -> style clause -> framing -> reference clause``.
 Framing comes after the style, so it has the last word on layout and lighting.
-The style clause is the world's ``style.txt``; :data:`STYLES` are the presets
+The style clause is the world's style (in ``world.json``); :data:`STYLES` are the presets
 new worlds start from.
 """
 
@@ -106,23 +106,26 @@ CHARACTER_FRAMING = (
     "seamless background. Full body, head to feet, standing upright in a neutral "
     "relaxed A-pose with the arms held slightly away from the torso and the legs "
     "straight. Show exactly three views of the same character in a single image, "
-    "arranged in one horizontal row, left to right: front view, side profile "
-    "view, back view. All three views share the same character design, the same "
-    "scale, the same height, and the same eye line. Even flat lighting with no "
-    "cast shadow on the backdrop. No props, no accessories beyond the described "
-    "costume, no scenery, no text, no labels, no borders or panel frames."
+    "arranged in one horizontal row, left to right: front view, three-quarter "
+    "view (turned about 45 degrees), back view. No side profile view. All three "
+    "views share the same character design, the same scale, the same height, and "
+    "the same eye line. Even flat lighting with no cast shadow on the backdrop. "
+    "No props, no accessories beyond the described costume, no scenery, no text, "
+    "no labels, no borders or panel frames."
 )
 
 OBJECT_FRAMING = (
     "Render this as an object turnaround reference sheet. Pure solid white "
-    "seamless background. Show exactly two orthographic views of the same object "
-    "in a single image, arranged in one horizontal row, left to right: front view "
-    "along the Z axis, side view along the X axis. Exactly two views and no "
-    "others — no top view, no back view, no perspective view. Both views share "
-    "the same object design, scale and lighting. The object is isolated and "
-    "centred in each view. Even flat lighting, no cast shadow on the backdrop, no "
-    "ground plane. No characters, no people, no hands holding the object, no "
-    "text, no labels, no dimension lines, no borders."
+    "seamless background. Show exactly two views of the same object in a single "
+    "image, arranged in one horizontal row, left to right: a front isometric view "
+    "(seen from the front, slightly above and to one side, so the front, one side "
+    "and the top read at once, with parallel edges and no vanishing point), and a "
+    "flat side view along the X axis. Exactly two views and no others — no "
+    "separate top view, no back view. Both views share the same object design, "
+    "scale and lighting. The object is isolated and centred in each view. Even "
+    "flat lighting, no cast shadow on the backdrop, no ground plane. No "
+    "characters, no people, no hands holding the object, no text, no labels, no "
+    "dimension lines, no borders."
 )
 
 # Location and shot framings are split around their one lighting sentence,
@@ -130,10 +133,27 @@ OBJECT_FRAMING = (
 _LOCATION_COMPOSITION = (
     "Render this as an empty background plate for animation. The environment is "
     "completely unoccupied: no characters, no people, no figures, no crowds, no "
-    "animals, and no foreground subject of any kind anywhere in the frame. Wide "
-    "establishing view of the space itself with a consistent single-point "
-    "perspective and a clear horizon. "
+    "animals, and no foreground subject of any kind anywhere in the frame. "
 )
+
+#: The fixed views every location is rendered in, in order. The first is the
+#: establishing view; the others are rendered from it as the same place.
+LOCATION_VIEWS: dict[str, str] = {
+    "establishing": (
+        "Wide establishing view of the space itself with a consistent single-point "
+        "perspective and a clear horizon. "
+    ),
+    "reverse": (
+        "Reverse angle: the camera stands on the far side of the space and looks "
+        "back towards where the establishing view was taken, so the opposite side "
+        "of the same place fills the frame, with a consistent single-point "
+        "perspective and a clear horizon. "
+    ),
+    "detail": (
+        "Closer medium view at eye level of one characteristic corner of the space, "
+        "framed as a backdrop a character could stand in, with the ground visible. "
+    ),
+}
 _LOCATION_TAIL = "No text, no signage lettering, no watermarks, no borders."
 
 _SHOT_COMPOSITION = (
@@ -152,25 +172,28 @@ _MONOCHROME_RENDERING = (
     "shadow. "
 )
 
+_LOCATION_LIGHTING = (
+    "Light the environment as a usable backdrop, readable across the whole "
+    "frame with nothing blown out and nothing crushed to black. "
+)
+
 FRAMING: dict[str, str] = {
     "character": CHARACTER_FRAMING,
     "object": OBJECT_FRAMING,
-    "location": _LOCATION_COMPOSITION
-    + "Light the environment as a usable backdrop, readable across the whole "
-    "frame with nothing blown out and nothing crushed to black. "
-    + _LOCATION_TAIL,
+    "location": _LOCATION_COMPOSITION + "{view}" + _LOCATION_LIGHTING + _LOCATION_TAIL,
     "shot": _SHOT_COMPOSITION + "Unified lighting and colour grade across the whole frame. " + _SHOT_TAIL,
 }
 
-#: Framings for line-only styles. Matched on the exact preset text, so an edited style.txt gets the default framing.
+#: Framings for line-only styles. Matched on the exact preset text, so an edited style gets the default framing.
 MONOCHROME_FRAMING: dict[str, str] = {
-    "location": _LOCATION_COMPOSITION + _MONOCHROME_RENDERING + _LOCATION_TAIL,
+    "location": _LOCATION_COMPOSITION + "{view}" + _MONOCHROME_RENDERING + _LOCATION_TAIL,
     "shot": _SHOT_COMPOSITION + _MONOCHROME_RENDERING + _SHOT_TAIL,
 }
 _MONOCHROME_STYLES = {STYLES["ligne_claire_lineart"]}
 
-#: How references are used. Characters, objects and locations take them as
-#: inspiration (never for the style); shots take them as designs to reproduce.
+#: How references are used. New characters, objects and locations take them as
+#: inspiration (never for the style); variations, location views and shots take
+#: them as designs to reproduce.
 REFERENCE_CLAUSES: dict[str, str] = {
     "character": (
         "Reference images are provided as inspiration, not as something to copy. "
@@ -221,22 +244,53 @@ REFERENCE_CLAUSES: dict[str, str] = {
         "sheet layout of the references themselves (the multiple views and the "
         "blank backdrop); their designs are what carry over."
     ),
+    "variation": (
+        "The first reference image is the established design of this subject, and "
+        "it is fact, not inspiration: keep its identity, face, proportions, "
+        "silhouette, materials and colour palette exactly, and change only what the "
+        "variation above describes. A viewer must recognise it as the same subject. "
+        "Any further reference images are inspiration for that change only; do not "
+        "adopt their art style. The style is defined by the style description above."
+    ),
+    "view": (
+        "The reference image is the establishing view of this exact location, and "
+        "it is fact, not inspiration. Show the same place — the same layout, "
+        "architecture, materials, palette, weather and time of day — only from the "
+        "camera position described here. Do not invent a different or neighbouring "
+        "place, and keep it empty of figures."
+    ),
 }
 
 
-def build_prompt(asset_type: str, description: str, style: str, with_references: bool = False) -> str:
-    """Compose the full prompt for one image. For a shot, ``description`` is the situation to depict."""
+def variation_description(description: str, variation: str, change: str) -> str:
+    """What a variation of a character or object shows: the subject, then what is different."""
+    return f"{description.strip()}\n\nVariation \"{variation}\": {change.strip()}"
+
+
+def build_prompt(
+    asset_type: str,
+    description: str,
+    style: str,
+    clause: str | None = None,
+    view: str = "establishing",
+) -> str:
+    """Compose the full prompt for one image. For a shot, ``description`` is the situation to depict.
+
+    ``clause`` names the :data:`REFERENCE_CLAUSES` entry for the attached
+    references (``None`` when there are none). ``view`` is the camera of a location.
+    """
     if asset_type not in FRAMING:
         raise ValueError(f"asset_type must be one of {sorted(FRAMING)}, got {asset_type!r}")
     if not style.strip():
-        raise ValueError("this world has no style yet - write one in style.txt (sidebar)")
+        raise ValueError("this world has no style yet - write one in the sidebar")
     if not description.strip():
         raise ValueError("description must not be empty")
 
     framing = FRAMING[asset_type]
     if style.strip() in _MONOCHROME_STYLES:
         framing = MONOCHROME_FRAMING.get(asset_type, framing)
+    framing = framing.replace("{view}", LOCATION_VIEWS[view])
     parts = [description.strip(), style.strip(), framing]
-    if with_references:
-        parts.append(REFERENCE_CLAUSES[asset_type])
+    if clause:
+        parts.append(REFERENCE_CLAUSES[clause])
     return "\n\n".join(parts)

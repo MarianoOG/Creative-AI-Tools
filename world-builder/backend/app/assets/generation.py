@@ -1,8 +1,9 @@
-"""Image generation with OpenAI (gpt-image-2) and Gemini (Nano Banana 2).
+"""Image generation with OpenAI (gpt-image-2) or Gemini (Nano Banana 2), one provider per image.
 
 Files are written to the folder the caller passes (an asset-type folder, or a
-scene folder for shots) as ``{name}_{uuid8}_{provider}``, with the extension of
-the returned bytes (OpenAI PNG, Gemini JPEG). Output is always 2K.
+scene folder for shots) as ``{uuid8}-{label}``, with the extension of the
+returned bytes (OpenAI PNG, Gemini JPEG). Output is always 2K. Every render gets
+a new uuid, so nothing is ever overwritten.
 """
 
 from __future__ import annotations
@@ -11,7 +12,6 @@ import base64
 import mimetypes
 import os
 import uuid
-from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Optional, Sequence
@@ -22,7 +22,9 @@ from app.assets.prompt_manager import build_prompt
 
 OPENAI_MODEL = "gpt-image-2"
 GEMINI_MODEL = "gemini-nano-banana-2.1"
-PROVIDERS = ("openai", "gemini")
+#: Provider -> the name the forms show.
+PROVIDERS = {"openai": f"OpenAI {OPENAI_MODEL}", "gemini": "Gemini Nano Banana 2"}
+DEFAULT_PROVIDER = "openai"
 
 #: Friendly name -> the ratio Gemini takes.
 ASPECT_RATIOS = {"landscape": "16:9", "square": "1:1", "portrait": "9:16"}
@@ -37,6 +39,12 @@ QUALITY: dict[str, tuple[str, Optional[str]]] = {
     "medium": ("medium", None),
     "high": ("high", "high"),
 }
+
+#: Characters, objects and locations are always rendered like this; shots take
+#: their ratio from the episode and are always low quality (storyboard drafts).
+ASSET_ASPECT_RATIO = "landscape"
+ASSET_QUALITY = "high"
+SHOT_QUALITY = "low"
 
 _EXTENSIONS = {"PNG": ".png", "JPEG": ".jpg", "WEBP": ".webp"}
 
@@ -100,44 +108,36 @@ def _gemini_bytes(prompt: str, ratio: str, thinking_level: Optional[str], refere
     return base64.b64decode(output.data)
 
 
-def _render(provider: str, prompt: str, ratio: str, quality: str, references: list[Path], path_stem: Path) -> Path:
-    """Call one provider and save the bytes next to ``path_stem`` with the right extension."""
+def generate_image(
+    asset_type: str,
+    label: str,
+    description: str,
+    style: str,
+    directory: Path,
+    provider: str,
+    references: Sequence[Path] = (),
+    clause: Optional[str] = None,
+    view: str = "establishing",
+    aspect_ratio: str = ASSET_ASPECT_RATIO,
+    quality: str = ASSET_QUALITY,
+) -> Path:
+    """Render one image (an asset, or a ``"shot"``) with one provider and save it as ``{uuid8}-{label}`` in ``directory``.
+
+    ``clause`` says how ``references`` are used (see ``build_prompt``). Raises
+    if the provider fails; nothing is written then.
+    """
+    if provider not in PROVIDERS:
+        raise ValueError(f"provider must be one of {sorted(PROVIDERS)}")
+    references = list(references)
+    prompt = build_prompt(asset_type, description, style, clause=clause if references else None, view=view)
+    ratio = ASPECT_RATIOS[aspect_ratio]
     openai_quality, thinking_level = QUALITY[quality]
     if provider == "openai":
         data = _openai_bytes(prompt, ratio, openai_quality, references)
     else:
         data = _gemini_bytes(prompt, ratio, thinking_level, references)
     image_format = Image.open(BytesIO(data)).format
-    path = path_stem.with_name(f"{path_stem.name}_{provider}{_EXTENSIONS.get(image_format, '.png')}")
-    path.parent.mkdir(parents=True, exist_ok=True)
+    path = directory / f"{uuid.uuid4().hex[:8]}-{label}{_EXTENSIONS.get(image_format, '.png')}"
+    directory.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
     return path
-
-
-def generate_asset(
-    asset_type: str,
-    name: str,
-    description: str,
-    style: str,
-    directory: Path,
-    references: Sequence[Path] = (),
-    aspect_ratio: str = "landscape",
-    quality: str = "low",
-    provider: str = "both",
-) -> dict[str, Path | Exception]:
-    """Render one image (an asset, or a ``"shot"``) into ``directory`` with one provider or ``"both"`` (concurrently).
-
-    Returns ``{provider: Path}``; a provider that failed holds its exception
-    instead, so one failure never discards the other image. A ``"both"`` run
-    shares one uuid across its pair.
-    """
-    references = list(references)
-    prompt = build_prompt(asset_type, description, style, with_references=bool(references))
-    ratio = ASPECT_RATIOS[aspect_ratio]
-    uid = uuid.uuid4().hex[:8]
-    stem = directory / f"{name}_{uid}"
-    providers = PROVIDERS if provider == "both" else (provider,)
-
-    with ThreadPoolExecutor(max_workers=len(providers)) as pool:
-        futures = {p: pool.submit(_render, p, prompt, ratio, quality, references, stem) for p in providers}
-    return {p: future.exception() or future.result() for p, future in futures.items()}

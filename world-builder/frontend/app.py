@@ -53,7 +53,7 @@ st.html(
 pages = {
     "World": [
         st.Page("pages/world.py", title="World", icon=":material/public:", default=True),
-        st.Page("pages/create.py", title="Create asset", icon=":material/add_photo_alternate:"),
+        st.Page("pages/asset.py", title="Asset", icon=":material/add_photo_alternate:"),
     ],
     "Story": [
         st.Page("pages/episode.py", title="Episode script", icon=":material/description:"),

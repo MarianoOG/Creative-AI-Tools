@@ -1,8 +1,9 @@
 # World Builder
 
-Build **worlds** with OpenAI and Gemini. Each world has one visual style (its
-`style.txt`), its **characters**, **locations** and **objects**, and its
-**episodes**: scenes made of storyboard shots, written in a `script.json`.
+Build **worlds** with OpenAI or Gemini. Each world has a `world.json` holding
+its visual style and its **characters**, **locations** and **objects** (with
+their variations), and its **episodes**: scenes made of storyboard shots,
+written in a `script.json`.
 
 | Service | What it does | `data/` access |
 | --- | --- | --- |
@@ -18,14 +19,16 @@ works is in `backend/app/assets/README.md`.
 
 | Page | What it shows |
 | --- | --- |
-| World | The world's characters, locations, objects and episodes, one tab each. Create and delete episodes here. |
-| Create asset | Generate a character, location or object in the world's style. |
-| Episode script | The whole episode as text, scene by scene, with each scene's references. Add, edit and delete scenes. |
-| Storyboard | One scene's shots: each frame next to its action and dialogue, and generation of the missing frames. |
+| World | The world's characters, locations and objects (three columns, each shown by its preferred image) and episodes, one tab each. Create assets (a name and a description) and episodes here. Click an image or Edit to open the asset. |
+| Asset | One asset: edit its name and description, and generate, prefer, regenerate (one or all) and delete its variations, or a location's views. |
+| Episode script | The whole episode as text, scene by scene, with each scene's references. Add, edit and delete scenes, and set the episode's model and aspect ratio. |
+| Storyboard | One scene's shots: each frame next to its action and dialogue, generation of the missing frames, and regeneration. |
 | Manage worlds | Create (from a style preset), rename and delete worlds. |
 
-The sidebar holds the world picker and the world's `style.txt`, editable in place.
-Deleting an episode or a scene asks first, because its shots go with it.
+The sidebar holds the world picker and the world's style, editable in place.
+Nothing in the app removes a file. Deleting an asset or a variation only drops
+it from `world.json`; deleting a world, an episode or a scene moves its folder
+into a hidden `.deleted/` folder next to it. Each asks first.
 
 ## Setup
 

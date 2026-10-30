@@ -54,7 +54,7 @@ def render_world_row(entry: Dict, active: bool) -> None:
             notify('success', f"Renamed **{world}** to **{renamed}**.")
 
     with delete_col:
-        st.caption(f"Deletes {world}, its {plural(count)} and every episode. This cannot be undone.")
+        st.caption(f"Removes {world}, its {plural(count)} and every episode from the app. Its folder is kept, hidden.")
         confirmed = st.checkbox("Confirm delete", key=f"confirm_world_{world}")
         if st.button("Delete", icon=":material/delete:", key=f"delete_world_{world}", disabled=not confirmed):
             try:
@@ -72,7 +72,7 @@ def main() -> None:
 
     st.title("Worlds")
     st.caption(
-        "A world has one style (its style.txt) and owns its characters, "
+        "A world has one style and owns its characters, "
         "locations, objects and episodes."
     )
     show_notice()

@@ -10,7 +10,7 @@ import streamlit as st
 import api
 from shared.state import notify, show_notice
 from shared.story import asset_names, episode_url, open_storyboard, pick_episode, references_markdown, scene_fields
-from shared.worlds import render_world_switcher
+from shared.worlds import model_select, render_world_switcher
 
 
 def save(world: str, episode: str, script: Dict, message: str) -> None:
@@ -23,14 +23,25 @@ def save(world: str, episode: str, script: Dict, message: str) -> None:
 
 
 def render_header(world: str, episode: str, script: Dict) -> None:
-    with st.expander("Edit title and synopsis"):
+    options = api.options()
+    with st.expander("Edit title, synopsis and storyboard settings"):
         title = st.text_input("Title", value=script['title'], key=f"title_{episode}")
         synopsis = st.text_area("Synopsis", value=script['synopsis'], key=f"synopsis_{episode}")
+        model_col, ratio_col = st.columns(2)
+        with model_col:
+            provider = model_select(options, key=f"provider_{episode}", default=script['provider'])
+        ratios = options['aspect_ratios']
+        aspect_ratio = ratio_col.selectbox(
+            "Aspect ratio", ratios, index=ratios.index(script['aspect_ratio']), key=f"ratio_{episode}"
+        )
+        st.caption("Every storyboard frame of the episode uses this model and aspect ratio, at low quality.")
         if st.button("Save", key=f"save_header_{episode}"):
-            save(world, episode, {**script, 'title': title, 'synopsis': synopsis}, "Saved.")
+            fields = {'title': title, 'synopsis': synopsis, 'provider': provider, 'aspect_ratio': aspect_ratio}
+            save(world, episode, {**script, **fields}, "Saved.")
     st.title(script['title'])
     if script['synopsis']:
         st.write(f"*{script['synopsis']}*")
+    st.caption(f"Storyboard: {options['providers'][script['provider']]} · {script['aspect_ratio']}")
 
 
 def render_shots(shots: List[Dict]) -> None:
@@ -64,7 +75,7 @@ def render_scene(world: str, episode: str, script: Dict, index: int, names: Dict
             scenes[index] = edited
             save(world, episode, {**script, 'scenes': scenes}, f"Saved **{scene['id']}**.")
     with delete_col.popover("Delete", width='stretch'):
-        st.warning(f"All {len(scene['shots'])} shots of **{scene['id']}** and their images will be lost.")
+        st.warning(f"All {len(scene['shots'])} shots of **{scene['id']}** will be removed from the script (the folder is kept, hidden).")
         if st.button("Delete scene", icon=":material/delete:", key=f"delete_{scene['id']}"):
             api.delete(f"{episode_url(world, episode)}/scenes/{scene['id']}")
             notify('success', f"Deleted **{scene['id']}**.")

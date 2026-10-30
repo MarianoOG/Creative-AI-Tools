@@ -1,4 +1,7 @@
-"""Storyboard: one scene's shots, each with its frame and its text, and generation of the missing frames.
+"""Storyboard: one scene's shots, each with its one frame and its text, and generation of the missing frames.
+
+Frames use the episode's model and aspect ratio (set on the Episode page), at
+low quality. Regenerating replaces a shot's frame; the old file stays on disk.
 
 Every change (save, add, delete) first collects what is typed in the widgets,
 so no unsaved edit is lost.
@@ -54,41 +57,34 @@ def save(world: str, episode: str, script: Dict, scene: Dict) -> Dict:
     return api.put(episode_url(world, episode), json={**script, 'scenes': scenes})
 
 
-def next_shot_id(shots: List[Dict], unassigned: List[Dict]) -> str:
-    """A fresh ``shot_N``. Counts unlinked frames too, so a new shot never inherits a removed one's images."""
-    taken = [shot['id'] for shot in shots] + [frame['name'] for frame in unassigned]
+def next_shot_id(shots: List[Dict]) -> str:
+    """A fresh ``shot_N``."""
+    taken = [shot['id'] for shot in shots]
     numbers = [int(m.group(1)) for name in taken if (m := re.fullmatch(r"shot_(\d+)", name))]
     return f"shot_{max(numbers, default=len(shots)) + 1}"
 
 
-def generate(world: str, episode: str, scene_id: str, shot_ids: List[str], options: Dict) -> None:
+def generate(world: str, episode: str, scene_id: str, shot_ids: List[str]) -> None:
     """Render each shot in turn, then rerun to show the new frames."""
     warnings = []
     with st.status(f"Generating {len(shot_ids)} frame(s)... each can take a few minutes.") as status:
         for shot_id in shot_ids:
             status.write(f"Rendering `{shot_id}`...")
             try:
-                result = api.post(f"{episode_url(world, episode)}/scenes/{scene_id}/shots/{shot_id}/generate", json=options)
+                api.post(f"{episode_url(world, episode)}/scenes/{scene_id}/shots/{shot_id}/generate")
             except api.ApiError as exc:
                 warnings.append(f"{shot_id}: {exc}")
-                continue
-            if result['warning']:
-                warnings.append(f"{shot_id}: {result['warning']}")
     if warnings:
         notify('warning', "Some renders failed: " + "; ".join(warnings))
     notify('success', f"Generated {len(shot_ids)} frame(s).")
 
 
 def render_shot(shot: Dict, prefix: str, number: int) -> Dict[str, bool]:
-    """One storyboard row: the newest frame on the left, the text on the right."""
+    """One storyboard row: the frame on the left, the text on the right."""
     image_col, text_col = st.columns([3, 2])
     with image_col:
-        if shot.get('frames'):
-            st.image(str(api.file_path(shot['frames'][0]['path'])), width='stretch')
-            if len(shot['frames']) > 1:
-                with st.expander(f"{len(shot['frames']) - 1} other take(s)"):
-                    for frame in shot['frames'][1:]:
-                        st.image(str(api.file_path(frame['path'])), caption=frame['label'], width='stretch')
+        if shot.get('path'):
+            st.image(str(api.file_path(shot['path'])), width='stretch')
         else:
             st.info("No frame yet.")
     with text_col:
@@ -103,7 +99,9 @@ def render_shot(shot: Dict, prefix: str, number: int) -> Dict[str, bool]:
         )
         generate_col, delete_col = st.columns(2)
         return {
-            'generate': generate_col.button("Generate", key=shot_key(prefix, shot, 'generate'), width='stretch'),
+            'generate': generate_col.button(
+                "Regenerate" if shot.get('path') else "Generate", key=shot_key(prefix, shot, 'generate'), width='stretch'
+            ),
             'delete': delete_col.button("Remove", key=shot_key(prefix, shot, 'remove'), width='stretch'),
         }
 
@@ -126,13 +124,10 @@ def main() -> None:
     prefix = f"sb_{world}_{episode}_{scene['id']}_"
     edited = scene_fields(scene, names, prefix)
 
-    options = api.options()
-    ratio_col, quality_col, save_col, missing_col = st.columns(4)
-    render_options = {
-        'aspect_ratio': ratio_col.selectbox("Aspect ratio", options['aspect_ratios'], key='sb_ratio'),
-        'quality': quality_col.selectbox("Quality", options['qualities'], key='sb_quality'),
-    }
-    missing = [shot['id'] for shot in scene['shots'] if not shot['frames']]
+    provider = api.options()['providers'][script['provider']]
+    settings_col, save_col, missing_col = st.columns([2, 1, 1])
+    settings_col.caption(f"Frames: {provider} · {script['aspect_ratio']} · low quality. Change them on the Episode page.")
+    missing = [shot['id'] for shot in scene['shots'] if not shot.get('path')]
     save_clicked = save_col.button("Save storyboard", type="primary", width='stretch')
     missing_clicked = missing_col.button(
         f"Generate {len(missing)} missing frame(s)", disabled=not missing, width='stretch'
@@ -145,15 +140,12 @@ def main() -> None:
     st.divider()
     add_clicked = st.button("Add shot", icon=":material/add:")
 
-    for unassigned in scene['unassigned']:
-        st.image(str(api.file_path(unassigned['path'])), caption=f"Not linked to a shot: {unassigned['label']}", width=300)
-
     # Act once every widget is drawn, so ``collect`` sees all of them.
     edited = collect(edited, prefix)
     to_generate = missing if missing_clicked else [i for i, a in actions.items() if a['generate']]
     removed = [i for i, a in actions.items() if a['delete']]
     if add_clicked:
-        edited['shots'].append({'id': next_shot_id(edited['shots'], scene['unassigned']), 'action': "", 'dialogue': []})
+        edited['shots'].append({'id': next_shot_id(edited['shots']), 'action': "", 'dialogue': []})
     if removed:
         edited['shots'] = [shot for shot in edited['shots'] if shot['id'] not in removed]
         for key in [k for k in st.session_state if any(k.startswith(f"{prefix}{i}_") for i in removed)]:
@@ -161,7 +153,7 @@ def main() -> None:
     if save_clicked or add_clicked or removed or to_generate:
         save(world, episode, script, edited)
         if to_generate:
-            generate(world, episode, scene['id'], to_generate, render_options)
+            generate(world, episode, scene['id'], to_generate)
         notify('success', "Storyboard saved.")
 
 

@@ -58,7 +58,7 @@ def remove_world(world: str) -> None:
 
 @router.get("/{world}/style")
 def get_style(world: str) -> Dict:
-    """The world's ``style.txt``: every image generated in it uses this style."""
+    """The world's style (in ``world.json``): every image generated in it uses this style."""
     return {"style": _call(read_style, world)}
 
 

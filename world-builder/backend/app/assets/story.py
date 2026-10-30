@@ -5,32 +5,37 @@
 
 Folders decide which episodes and scenes exist; ``script.json`` decides their
 order and content. A scene folder missing from the script is read as an empty
-scene, and a script entry without a folder is dropped. A shot's frames are the
-images in its scene folder whose name is the shot's id.
+scene, and a script entry without a folder is dropped. Each shot has one image,
+the file in its scene folder that ``image`` names; regenerating points it at a
+new file and leaves the old one on disk. The episode's ``provider`` and
+``aspect_ratio`` are used for every shot in it.
 
 script.json::
 
     {
-      "title": "...", "synopsis": "...",
+      "title": "...", "synopsis": "...", "provider": "openai", "aspect_ratio": "landscape",
       "scenes": [{
         "id": "scene1", "heading": "INT. KITCHEN - DAY", "summary": "...",
-        "characters": ["fox"], "locations": ["kitchen"], "objects": ["lantern"],
-        "shots": [{"id": "shot_1", "action": "...", "dialogue": [{"character": "fox", "line": "..."}]}]
+        "characters": ["fox", "fox:older"], "locations": ["kitchen"], "objects": ["lantern"],
+        "shots": [{"id": "shot_1", "action": "...", "dialogue": [{"character": "fox", "line": "..."}],
+                   "image": "1a2b3c4d-shot_1.png"}]
       }]
     }
+
+Scripts from before ``image`` existed get their shot's newest frame on read.
 """
 
 from __future__ import annotations
 
 import json
 import re
-import shutil
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-from app.assets.library import images_in, parse_asset
+from app.assets.generation import ASPECT_RATIOS, DEFAULT_PROVIDER, PROVIDERS
 from app.assets.prompt_manager import ASSET_DIRS
-from app.assets.worlds import slugify, world_dir
+from app.assets.worlds import images_in, legacy_name, move_to_deleted, slugify, subfolders, world_dir
+from app.settings import relative
 
 SCRIPT_FILE = "script.json"
 
@@ -61,28 +66,34 @@ def scene_dir(world: str, episode: str, scene: str) -> Path:
 
 
 def list_episodes(world: str) -> List[str]:
-    directory = episodes_dir(world)
-    if not directory.is_dir():
-        return []
-    return sorted((p.name for p in directory.iterdir() if p.is_dir()), key=_natural)
+    return sorted(subfolders(episodes_dir(world)), key=_natural)
 
 
-def _clean_shot(raw: Dict) -> Dict:
+def _legacy_frame(folder: Path, shot_id: str) -> Optional[str]:
+    """The newest image named after the shot, for scripts from before ``image``."""
+    frames = [path for path in images_in(folder) if legacy_name(path)[0] == shot_id]
+    return max(frames, key=lambda path: path.stat().st_mtime).name if frames else None
+
+
+def _clean_shot(raw: Dict, folder: Path) -> Dict:
+    shot_id = slugify(str(raw.get("id", "")))
+    image = raw["image"] if "image" in raw else _legacy_frame(folder, shot_id)
     return {
-        "id": slugify(str(raw.get("id", ""))),
+        "id": shot_id,
         "action": str(raw.get("action", "")),
         "dialogue": [
             {"character": str(d.get("character", "")), "line": str(d.get("line", ""))}
             for d in raw.get("dialogue", [])
             if str(d.get("line", "")).strip()
         ],
+        "image": Path(str(image)).name if image else None,
     }
 
 
-def _clean_scene(raw: Dict, scene_id: str) -> Dict:
+def _clean_scene(raw: Dict, scene_id: str, folder: Path) -> Dict:
     shots, seen = [], set()
     for number, shot in enumerate(raw.get("shots", []), start=1):
-        shot = _clean_shot(shot)
+        shot = _clean_shot(shot, folder)
         # Ids name the frame files, so they must be unique and non-empty.
         while not shot["id"] or shot["id"] in seen:
             shot["id"] = f"shot_{number}"
@@ -101,13 +112,15 @@ def _clean_scene(raw: Dict, scene_id: str) -> Dict:
 def _normalise(world: str, episode: str, raw: Dict) -> Script:
     """Fit a script to the folders on disk: their scenes, in the script's order."""
     directory = episode_dir(world, episode)
-    folders = {p.name for p in directory.iterdir() if p.is_dir()} if directory.is_dir() else set()
+    folders = set(subfolders(directory))
     by_id = {scene.get("id"): scene for scene in raw.get("scenes", []) if scene.get("id") in folders}
     order = list(by_id) + sorted(folders - set(by_id), key=_natural)
     return {
         "title": str(raw.get("title") or episode),
         "synopsis": str(raw.get("synopsis", "")),
-        "scenes": [_clean_scene(by_id.get(scene_id, {}), scene_id) for scene_id in order],
+        "provider": raw.get("provider") if raw.get("provider") in PROVIDERS else DEFAULT_PROVIDER,
+        "aspect_ratio": raw.get("aspect_ratio") if raw.get("aspect_ratio") in ASPECT_RATIOS else "landscape",
+        "scenes": [_clean_scene(by_id.get(scene_id, {}), scene_id, directory / scene_id) for scene_id in order],
     }
 
 
@@ -121,23 +134,43 @@ def read_script(world: str, episode: str) -> Script:
 
 
 def save_script(world: str, episode: str, raw: Dict) -> Script:
+    """Save a script. A shot or setting the client left out keeps what is on disk, so a page that only edits text never drops an image."""
+    current = read_script(world, episode)
+    images = {(scene["id"], shot["id"]): shot["image"] for scene in current["scenes"] for shot in scene["shots"]}
+    raw = {
+        **{key: current[key] for key in ("provider", "aspect_ratio")},
+        **raw,
+        "scenes": [
+            {**scene, "shots": [
+                {"image": images.get((scene.get("id"), slugify(str(shot.get("id", ""))))), **shot}
+                for shot in scene.get("shots", [])
+            ]}
+            for scene in raw.get("scenes", current["scenes"])
+        ],
+    }
     script = _normalise(world, episode, raw)
     (episode_dir(world, episode) / SCRIPT_FILE).write_text(json.dumps(script, indent=2, ensure_ascii=False) + "\n")
     return script
 
 
-def with_frames(world: str, episode: str, script: Script) -> Script:
-    """Attach each shot's images (newest first), and the scene's images no shot claims."""
+def with_images(world: str, episode: str, script: Script) -> Script:
+    """Give each shot the data-relative ``path`` of its image, or ``None`` if it has none (or the file is gone)."""
     for scene in script["scenes"]:
-        frames = [
-            parse_asset(path, "shot", world) for path in images_in(scene_dir(world, episode, scene["id"]))
-        ]
-        frames.sort(key=lambda frame: frame["mtime"], reverse=True)
-        ids = {shot["id"] for shot in scene["shots"]}
+        folder = scene_dir(world, episode, scene["id"])
         for shot in scene["shots"]:
-            shot["frames"] = [frame for frame in frames if frame["name"] == shot["id"]]
-        scene["unassigned"] = [frame for frame in frames if frame["name"] not in ids]
+            path = folder / shot["image"] if shot["image"] else None
+            shot["path"] = relative(path) if path and path.is_file() else None
     return script
+
+
+def set_shot_image(world: str, episode: str, scene: str, shot: str, image: Path) -> Script:
+    """Point a shot at a new image. The previous file stays in the scene folder."""
+    script = read_script(world, episode)
+    for scene_data in script["scenes"]:
+        for shot_data in scene_data["shots"]:
+            if scene_data["id"] == scene and shot_data["id"] == shot:
+                shot_data["image"] = image.name
+    return save_script(world, episode, script)
 
 
 def _new_dir(parent: Path, name: str, what: str) -> Path:
@@ -158,11 +191,11 @@ def create_episode(world: str, name: str) -> str:
 
 
 def delete_episode(world: str, episode: str) -> None:
-    """Delete an episode with all its scenes and shots. There is no undo."""
+    """Hide an episode with all its scenes and shots: its folder moves into ``episodes/.deleted/``."""
     directory = episode_dir(world, episode)
     if not directory.is_dir():
         raise ValueError(f"no episode called {episode!r}")
-    shutil.rmtree(directory)
+    move_to_deleted(directory)
 
 
 def create_scene(world: str, episode: str, name: str) -> str:
@@ -174,12 +207,25 @@ def create_scene(world: str, episode: str, name: str) -> str:
 
 
 def delete_scene(world: str, episode: str, scene: str) -> None:
-    """Delete a scene with all its shots. There is no undo."""
+    """Hide a scene with all its shots: its folder moves into the episode's ``.deleted/``."""
     directory = scene_dir(world, episode, scene)
     if not directory.is_dir():
         raise ValueError(f"no scene called {scene!r}")
-    shutil.rmtree(directory)
+    move_to_deleted(directory)
     save_script(world, episode, read_script(world, episode))
+
+
+def rename_references(world: str, folder: str, old: str, new: str) -> None:
+    """Point every scene reference to asset ``old`` (``old`` and ``old:variation``) in one ``folder`` at ``new``."""
+    for episode in list_episodes(world):
+        script = read_script(world, episode)
+        changed = False
+        for scene in script["scenes"]:
+            renamed = [new + ref[len(old):] if ref == old or ref.startswith(f"{old}:") else ref for ref in scene[folder]]
+            changed |= renamed != scene[folder]
+            scene[folder] = renamed
+        if changed:
+            save_script(world, episode, script)
 
 
 def shot_description(scene: Dict, shot: Dict, reference_names: List[str]) -> str:

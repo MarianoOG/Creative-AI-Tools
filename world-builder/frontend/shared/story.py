@@ -42,12 +42,21 @@ def open_storyboard(scene: str) -> None:
 
 
 def asset_names(world: str) -> Dict[str, List[str]]:
-    """Script field -> the names of that type in the world, for the reference pickers."""
+    """Script field -> every reference of that type in the world (``name``, then each ``name:variation``), for the pickers."""
     names = {}
     for field, asset_type in REFERENCE_FIELDS.items():
         assets = api.get("/assets", world=world, asset_type=asset_type)['assets']
-        names[field] = sorted({asset['name'] for asset in assets})
+        names[field] = [
+            ref
+            for asset in assets if asset['variations']
+            for ref in [asset['name'], *(variation['ref'] for variation in asset['variations'])]
+        ]
     return names
+
+
+def reference_label(reference: str) -> str:
+    """``fox:older`` reads as ``fox · older``; a bare name is the asset's preferred image."""
+    return reference.replace(":", " · ", 1) if ":" in reference else f"{reference} (preferred)"
 
 
 def scene_fields(scene: Dict, names: Dict[str, List[str]], prefix: str) -> Dict:
@@ -58,7 +67,9 @@ def scene_fields(scene: Dict, names: Dict[str, List[str]], prefix: str) -> Dict:
     for column, field in zip(st.columns(len(REFERENCE_FIELDS)), REFERENCE_FIELDS):
         # Keep names whose asset is gone, so opening the editor never drops them.
         options = names[field] + [name for name in scene[field] if name not in names[field]]
-        picks[field] = column.multiselect(field.capitalize(), options, default=scene[field], key=f"{prefix}{field}")
+        picks[field] = column.multiselect(
+            field.capitalize(), options, default=scene[field], format_func=reference_label, key=f"{prefix}{field}"
+        )
     return {**scene, 'heading': heading, 'summary': summary, **picks}
 
 
@@ -80,7 +91,7 @@ def parse_dialogue(text: str) -> List[Dict]:
 
 def references_markdown(scene: Dict) -> str:
     parts = [
-        f"**{field.capitalize()}:** " + ", ".join(f"`{name}`" for name in scene[field])
+        f"**{field.capitalize()}:** " + ", ".join(f"`{reference_label(name)}`" for name in scene[field])
         for field in REFERENCE_FIELDS
         if scene[field]
     ]
