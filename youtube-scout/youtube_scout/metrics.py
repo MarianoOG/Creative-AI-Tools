@@ -1,48 +1,29 @@
-"""Channel metrics, computed from the videos a channel record holds.
+"""Channel metrics, computed from a channel's ``videos``.
 
-Ratios are percentages. Medians are used over averages so one viral video does
-not skew a channel.
+Ratios are percentages. Medians keep one viral video from skewing a channel.
 """
-
-from __future__ import annotations
 
 from datetime import datetime, timezone
 from statistics import median
-from typing import Any, Dict, List, Optional
 
 
-def parse_datetime(value: Any) -> Optional[datetime]:
-    """An ISO 8601 string (or datetime) as an aware datetime; ``None`` if unusable."""
-    if isinstance(value, datetime):
-        moment = value
-    elif value:
-        try:
-            moment = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-        except ValueError:
-            return None
-    else:
+def parse_datetime(value: str | None) -> datetime | None:
+    """An ISO 8601 string as an aware datetime; ``None`` if missing or invalid."""
+    try:
+        moment = datetime.fromisoformat(value) if value else None
+    except ValueError:
         return None
-    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+    if moment and moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment
 
 
-def _median(values: List[int]) -> int:
+def _median(values: list[int]) -> int:
     return int(median(values)) if values else 0
 
 
-def publish_interval_days(dates: List[datetime]) -> Optional[float]:
-    """Average days between consecutive uploads; ``None`` with fewer than two dates."""
-    if len(dates) < 2:
-        return None
-    ordered = sorted(dates, reverse=True)
-    gaps = [(newer - older).days for newer, older in zip(ordered, ordered[1:])]
-    return sum(gaps) / len(gaps)
-
-
 def channel_score(
-    interval_days: Optional[float],
-    views_to_subs: float,
-    likes_to_views: float,
-    comments_to_views: float,
+    interval_days: float | None, views_to_subs: float, likes_to_views: float, comments_to_views: float
 ) -> int:
     """0-100: activity 30%, views-to-subscribers 35%, engagement 35%.
 
@@ -74,22 +55,22 @@ def channel_score(
     like_score = min(100, likes_to_views / 4 * 100)
     comment_score = min(100, comments_to_views / 0.5 * 100)
     engagement = like_score * 0.7 + comment_score * 0.3
-
     return round(activity * 0.30 + performance * 0.35 + engagement * 0.35)
 
 
-def compute_metrics(channel: Dict) -> Dict:
-    """Set every derived metric on ``channel`` (in place) and return it."""
+def compute_metrics(channel: dict) -> dict:
+    """Add every metric to ``channel`` (in place) and return it."""
     videos = channel.get("videos", [])
-    views = [v.get("views", 0) for v in videos]
-    dates = [d for d in (parse_datetime(v.get("published_at")) for v in videos) if d]
-    durations = [v["duration_seconds"] for v in videos if v.get("duration_seconds", 0) > 0]
+    views = [v["views"] for v in videos]
+    dates = sorted((d for d in (parse_datetime(v["published_at"]) for v in videos) if d), reverse=True)
+    durations = [v["duration_seconds"] for v in videos if v["duration_seconds"] > 0]
 
     median_views = _median(views)
-    median_likes = _median([v.get("likes", 0) for v in videos])
-    median_comments = _median([v.get("comment_count", 0) for v in videos])
+    median_likes = _median([v["likes"] for v in videos])
+    median_comments = _median([v["comment_count"] for v in videos])
     subscribers = channel.get("subscriber_count", 0)
-    interval = publish_interval_days(dates)
+    gaps = [(newer - older).days for newer, older in zip(dates, dates[1:])]
+    interval = sum(gaps) / len(gaps) if gaps else None
     views_to_subs = median_views / subscribers * 100 if subscribers else 0.0
     likes_to_views = median_likes / median_views * 100 if median_views else 0.0
     comments_to_views = median_comments / median_views * 100 if median_views else 0.0
@@ -101,7 +82,8 @@ def compute_metrics(channel: Dict) -> Dict:
         median_comments=median_comments,
         avg_duration=sum(durations) // len(durations) if durations else 0,
         publish_interval_days=round(interval, 1) if interval is not None else None,
-        last_published=max(dates).isoformat() if dates else None,
+        last_published=dates[0].isoformat() if dates else None,
+        days_since_last_published=(datetime.now(timezone.utc) - dates[0]).days if dates else None,
         views_to_subs_ratio=round(views_to_subs, 2),
         likes_to_views_ratio=round(likes_to_views, 2),
         comments_to_views_ratio=round(comments_to_views, 2),

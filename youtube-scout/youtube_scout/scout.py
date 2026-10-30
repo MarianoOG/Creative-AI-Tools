@@ -1,147 +1,124 @@
-"""The high-level operations: search, read a saved search, inspect one creator."""
+"""Search channels by keyword, filter and sort them, and inspect one creator."""
 
-from __future__ import annotations
+from collections import Counter
+from datetime import datetime, timedelta, timezone
 
-from typing import Callable, Dict, List, Optional
+from . import youtube_api as api
+from .metrics import compute_metrics, parse_datetime
+from .youtube_api import ScoutError
 
-from .channels import filter_channels, sort_channels, uploads_by_month, with_recency
-from .config import ScoutError
-from .metrics import compute_metrics
-from .store import find_search, load_search, save_search
-from .youtube_api import YouTubeClient
+#: ``relevance`` keeps search order; the rest are channel fields.
+SORT_FIELDS = (
+    "relevance",
+    "median_views",
+    "subscriber_count",
+    "last_published",
+    "channel_score",
+    "views_to_subs_ratio",
+    "likes_to_views_ratio",
+)
 
-DEFAULT_MAX_RESULTS = 1000
 
+def search(keyword: str, max_results: int = 1000) -> dict:
+    """The channels behind the top ``max_results`` videos for ``keyword``.
 
-def search(
-    keyword: str,
-    *,
-    max_results: int = DEFAULT_MAX_RESULTS,
-    use_cache: bool = True,
-    client: Optional[YouTubeClient] = None,
-    on_progress: Optional[Callable[[str], None]] = None,
-) -> Dict:
-    """Find the channels behind the videos YouTube returns for ``keyword``, and save them.
-
-    With ``use_cache`` the newest saved search for the same keyword is returned
-    instead of spending quota again. Returns the saved record
-    ``{id, keyword, created_at, channels: {channel_id: channel}}``, channels in
-    relevance order. No filtering happens here: filter the saved result.
+    Returns ``{keyword, channels}``: channels in relevance order, each with its
+    profile, the ``videos`` the search found and their metrics.
     """
     keyword = keyword.strip()
     if not keyword:
         raise ScoutError("Enter a search term.")
-    progress = on_progress or (lambda message: None)
-
-    if use_cache:
-        cached = find_search(keyword)
-        if cached is not None:
-            progress(f"Using saved search {cached['id']}")
-            return cached
-
-    client = client or YouTubeClient()
-    progress("Searching for videos...")
-    hits = client.search_videos(keyword, max_results)
+    hits = api.search_videos(keyword, max_results)
     if not hits:
         raise ScoutError(f"No videos found for {keyword!r}")
-    progress(f"Found {len(hits)} videos; fetching video statistics...")
-    videos = client.get_videos(list(dict.fromkeys(h["video_id"] for h in hits)))
-    channel_ids = list(dict.fromkeys(h["channel_id"] for h in hits))
-    progress(f"Fetching statistics for {len(channel_ids)} channels...")
-    channel_stats = client.get_channels(channel_ids)
+    videos = api.get_videos(list(dict.fromkeys(h["video_id"] for h in hits)))
+    profiles = api.get_channels(list(dict.fromkeys(h["channel_id"] for h in hits)))
 
-    channels: Dict[str, Dict] = {}
+    channels: dict[str, dict] = {}
     seen = set()
     for hit in hits:
-        video, stats = videos.get(hit["video_id"]), channel_stats.get(hit["channel_id"])
-        if video is None or stats is None or hit["video_id"] in seen:
-            continue
-        seen.add(hit["video_id"])
-        channels.setdefault(hit["channel_id"], {**stats, "videos": []})["videos"].append(video)
+        video, profile = videos.get(hit["video_id"]), profiles.get(hit["channel_id"])
+        if video and profile and hit["video_id"] not in seen:
+            seen.add(hit["video_id"])
+            channels.setdefault(hit["channel_id"], {**profile, "videos": []})["videos"].append(video)
     if not channels:
         raise ScoutError(f"No channels found for {keyword!r}")
-    for channel in channels.values():
-        compute_metrics(channel)
-
-    record = save_search(keyword, channels)
-    progress(f"Found {len(channels)} creators; saved as {record['id']}")
-    return record
+    return {"keyword": keyword, "channels": [compute_metrics(c) for c in channels.values()]}
 
 
-def get_channels(
-    search_id: str,
+def _within(value: float, low: float | None, high: float | None = None) -> bool:
+    return (low is None or value >= low) and (high is None or value <= high)
+
+
+def _active_within(channel: dict, days: int) -> bool:
+    last = parse_datetime(channel["last_published"])
+    return last is not None and last >= datetime.now(timezone.utc) - timedelta(days=days)
+
+
+def filter_channels(
+    channels: list[dict],
     *,
-    sort_by: str = "relevance",
-    descending: bool = True,
-    limit: Optional[int] = None,
-    min_views: Optional[int] = None,
-    max_views: Optional[int] = None,
-    min_subscribers: Optional[int] = None,
-    max_subscribers: Optional[int] = None,
-    active_within_days: Optional[int] = None,
-    min_videos: Optional[int] = None,
-    max_videos: Optional[int] = None,
-    min_score: Optional[int] = None,
-) -> List[Dict]:
-    """A saved search's channels, filtered, sorted and cut to ``limit``. Costs no quota.
+    min_views: int | None = None,
+    max_views: int | None = None,
+    min_subscribers: int | None = None,
+    max_subscribers: int | None = None,
+    active_within_days: int | None = None,
+    min_videos: int | None = None,
+    max_videos: int | None = None,
+    min_score: int | None = None,
+) -> list[dict]:
+    """Channels within every given bound (inclusive), order kept.
 
-    See ``filter_channels`` for the bounds and ``SORT_FIELDS`` for ``sort_by``.
-    Each channel also gets ``days_since_last_published``.
+    Views are median views; videos are the channel's total uploads.
     """
-    channels = filter_channels(
-        load_search(search_id)["channels"],
-        min_views=min_views,
-        max_views=max_views,
-        min_subscribers=min_subscribers,
-        max_subscribers=max_subscribers,
-        active_within_days=active_within_days,
-        min_videos=min_videos,
-        max_videos=max_videos,
-        min_score=min_score,
+    return [
+        c
+        for c in channels
+        if _within(c["median_views"], min_views, max_views)
+        and _within(c["subscriber_count"], min_subscribers, max_subscribers)
+        and _within(c["total_videos"], min_videos, max_videos)
+        and _within(c["channel_score"], min_score)
+        and (active_within_days is None or _active_within(c, active_within_days))
+    ]
+
+
+def sort_channels(channels: list[dict], sort_by: str = "relevance", descending: bool = True) -> list[dict]:
+    """Channels ordered by one of ``SORT_FIELDS``; those missing the field go last."""
+    if sort_by not in SORT_FIELDS:
+        raise ScoutError(f"sort_by must be one of {list(SORT_FIELDS)}, not {sort_by!r}")
+    if sort_by == "relevance":
+        return list(channels)
+    key = parse_datetime if sort_by == "last_published" else (lambda value: value)
+    present = [c for c in channels if c.get(sort_by) is not None]
+    missing = [c for c in channels if c.get(sort_by) is None]
+    return sorted(present, key=lambda c: key(c[sort_by]), reverse=descending) + missing
+
+
+def uploads_by_month(videos: list[dict], months: int = 6) -> list[dict]:
+    """Uploads per calendar month over the last ``months`` months, oldest first."""
+    counts = Counter(
+        d.strftime("%Y-%m") for d in (parse_datetime(v["published_at"]) for v in videos) if d
     )
-    ordered = sort_channels(channels, sort_by, descending)
-    return [with_recency(channel) for channel in ordered[:limit]]
+    now = datetime.now(timezone.utc)
+    keys = []
+    for back in range(months - 1, -1, -1):
+        year, month = divmod(now.year * 12 + now.month - 1 - back, 12)
+        keys.append(f"{year:04d}-{month + 1:02d}")
+    return [{"month": key, "uploads": counts[key]} for key in keys]
 
 
-def get_creator(
-    channel: str,
-    *,
-    search_id: Optional[str] = None,
-    max_videos: int = 50,
-    client: Optional[YouTubeClient] = None,
-) -> Dict:
-    """One channel's stats, metrics and video history.
+def get_creator(channel: str, max_videos: int = 50) -> dict:
+    """One channel (id or ``@handle``) with metrics over its latest uploads.
 
-    ``channel`` is a channel id, or a ``@handle`` when no ``search_id`` is given.
-    With ``search_id`` the stats and metrics come from that saved search (its
-    ``videos`` are the ones the search found); without it they are fetched, and
-    the metrics are computed over the latest uploads. ``latest_videos`` holds up
-    to ``max_videos`` (max 50) newest uploads, ``uploads_by_month`` their count
-    per month over the last six months. ``max_videos=0`` skips both, and with a
-    ``search_id`` then needs no API call at all.
+    ``videos`` holds up to ``max_videos`` (max 50) newest uploads, and
+    ``uploads_by_month`` their count per month over the last six months.
     """
-    if search_id:
-        record = load_search(search_id)["channels"].get(channel)
-        if record is None:
-            raise ScoutError(f"Channel {channel!r} is not in search {search_id!r}")
+    if channel.startswith("@"):
+        found = api.get_channels(handle=channel)
     else:
-        client = client or YouTubeClient()
-        stats = client.get_channel(channel)
-        if stats is None:
-            raise ScoutError(f"No channel {channel!r}")
-        record = {**stats, "videos": []}
-
-    latest: List[Dict] = []
-    if max_videos > 0 and record.get("uploads_playlist_id"):
-        client = client or YouTubeClient()
-        latest = client.get_latest_videos(record["uploads_playlist_id"], max_videos)
-
-    if not search_id:
-        record["videos"] = latest
-        compute_metrics(record)
-
-    return {
-        **with_recency(record),
-        "latest_videos": latest,
-        "uploads_by_month": uploads_by_month(latest),
-    }
+        found = api.get_channels([channel])
+    if not found:
+        raise ScoutError(f"No channel {channel!r}")
+    record = next(iter(found.values()))
+    latest = api.get_latest_videos(record["uploads_playlist_id"], max_videos)
+    return {**compute_metrics({**record, "videos": latest}), "uploads_by_month": uploads_by_month(latest)}
