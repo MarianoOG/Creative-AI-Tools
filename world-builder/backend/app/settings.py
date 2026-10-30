@@ -1,12 +1,4 @@
-"""Process-wide settings: where the shared data lives and where the keys come from.
-
-``DATA_DIR`` is the one folder the backend and the frontend share. The backend
-reads and writes it; the frontend mounts it read-only and opens whatever path
-the API hands back, so every path that crosses the API is relative to it.
-
-Keys are read from the environment. ``backend/.env`` is loaded for local runs;
-under docker compose the same file arrives as ``env_file`` and this is a no-op.
-"""
+"""Where the shared data folder is. Keys come from the environment (``backend/.env`` locally)."""
 
 from __future__ import annotations
 
@@ -15,20 +7,16 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-BACKEND_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
-load_dotenv(BACKEND_DIR / ".env")
-
-#: Defaults to ``world-builder/data`` so a local ``uvicorn`` run and a local
-#: ``streamlit run`` meet in the same place without any configuration.
-DATA_DIR = Path(os.environ.get("DATA_DIR", BACKEND_DIR.parent / "data")).resolve()
-
-ASSETS_DIR = DATA_DIR / "assets"
+#: Shared with the frontend, which opens the relative paths the API returns.
+#: Defaults to ``data/`` at the repository root.
+DATA_DIR = Path(os.environ.get("DATA_DIR") or Path(__file__).resolve().parents[3] / "data").resolve()
 
 
 def relative(path: Path) -> str:
-    """A path as the frontend should see it: relative to ``DATA_DIR``."""
-    return Path(path).resolve().relative_to(DATA_DIR).as_posix()
+    """A path as the frontend sees it: relative to ``DATA_DIR``."""
+    return path.resolve().relative_to(DATA_DIR).as_posix()
 
 
 def resolve(relative_path: str) -> Path:

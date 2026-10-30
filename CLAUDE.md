@@ -3,6 +3,7 @@
 AI tools for visual creative media (images and video): generating it and
 analysing it. Each top-level folder is a standalone tool: its own README,
 `requirements.txt`, `.env` and `.venv`. Tools do not import from each other.
+`data/` at the repository root is gitignored and holds World Builder's worlds.
 
 ## Project Structure
 
@@ -12,22 +13,20 @@ Creative AI Tools/
 │   ├── backend/                  # FastAPI service (all logic)
 │   │   └── app/
 │   │       ├── main.py           # App, lifespan, router registration, OpenAPI tags
-│   │       ├── settings.py       # DATA_DIR, .env loading, relative/resolve helpers
-│   │       ├── jobs.py           # Background job registry
-│   │       ├── routers/          # One router per tag: assets, worlds, jobs
+│   │       ├── settings.py       # DATA_DIR, .env loading, path helpers
+│   │       ├── routers/          # One router per tag: assets, worlds
 │   │       └── assets/           # Generation, prompts, library scan, worlds
 │   ├── frontend/                 # Streamlit service (visuals only)
 │   │   ├── app.py                # st.navigation entry point
 │   │   ├── api.py                # The only module that calls the backend
-│   │   ├── shared/               # Session state, world switcher, job tracking
+│   │   ├── shared/               # Session state, world switcher
 │   │   └── views/                # Pages
-│   ├── data/                     # Gitignored; backend writes, frontend reads
 │   ├── docker-compose.yml
 │   └── .venv/
-└── youtube-scout/                # YouTube channel and video research (library)
-    ├── youtube_scout/            # Package: API client, search, filters, metrics, saved searches
-    ├── data/                     # Gitignored; saved searches
-    └── .venv/
+├── youtube-scout/                # YouTube channel and video research (library)
+│   ├── youtube_scout/            # Package: API client, search, filters, metrics
+│   └── .venv/
+└── data/                         # Gitignored: <world>/<asset-type>/<image>
 ```
 
 ## Environment
@@ -42,7 +41,7 @@ cd world-builder && source .venv/bin/activate   # or youtube-scout
 ## World Builder
 
 Two services: a FastAPI backend with all the logic, and a Streamlit frontend
-that only renders what the backend returns. They share `world-builder/data/`:
+that only renders what the backend returns. They share the root `data/`:
 the backend reads and writes it, the frontend mounts it read-only and opens the
 relative paths the API returns.
 
@@ -52,13 +51,11 @@ cd world-builder/backend && uvicorn app.main:app --reload
 cd world-builder/frontend && streamlit run app.py
 ```
 
-The backend must run as a single process: the job registry is in memory.
-
 ## YouTube Scout
 
 A plain Python library: functions that take simple arguments and return
-JSON-serialisable data, so a CLI or agent skill can wrap them later. No UI or
-server.
+JSON-serialisable data, so a CLI or agent skill can wrap them later. No UI,
+server or stored data: every search is fresh.
 
 ## Workflow Guidelines
 
@@ -67,7 +64,7 @@ server.
 - **API keys:** Never commit `.env` files or expose API keys
 - **Dependencies:** Add new packages to the tool's (or service's) `requirements.txt`
 - **Logic vs. visuals (World Builder):** Business logic, validation and labels belong in the backend; the frontend only lays out what the API returns
-- **Separation:** Keep tools independent; don't share code or data folders between them
+- **Separation:** Keep tools independent; don't share code between them
 
 ## Code Style
 

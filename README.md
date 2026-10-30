@@ -10,5 +10,6 @@ README, dependencies and virtual environment.
 | [`youtube-scout/`](youtube-scout/README.md) | Research YouTube channels and videos: search, filter, and score creators and their uploads | Python library, built to be driven by an AI agent |
 
 Start with the README of the tool you want to use; each one explains its own
-setup. API keys live in each tool's `.env` (see its `.env.example`) and are
+setup. World Builder keeps its worlds in `data/` at the repository root
+(gitignored). API keys live in each tool's `.env` (see its `.env.example`) and are
 never committed.

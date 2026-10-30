@@ -1,10 +1,4 @@
-"""World Builder - one Streamlit app over the backend API.
-
-Run from the frontend directory, with the backend already running:
-
-    source .venv/bin/activate   # from world-builder/
-    cd frontend && streamlit run app.py
-"""
+"""World Builder UI. Run ``streamlit run app.py`` from ``frontend/`` with the backend running."""
 
 from __future__ import annotations
 
@@ -27,5 +21,5 @@ pages = {
 try:
     st.navigation(pages).run()
 except api.ApiError as exc:
-    # Anything a page did not handle itself - usually the backend being down.
+    # Anything a page did not handle itself, usually the backend being down.
     st.error(str(exc))

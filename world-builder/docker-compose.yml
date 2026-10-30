@@ -5,7 +5,7 @@ services:
     environment:
       DATA_DIR: /data
     volumes:
-      - ./data:/data
+      - ../data:/data
     # Bound to localhost: the API has no auth and can spend money.
     ports:
       - "127.0.0.1:8000:8000"
@@ -24,7 +24,7 @@ services:
       DATA_DIR: /data
     volumes:
       # Read-only: every write goes through the backend.
-      - ./data:/data:ro
+      - ../data:/data:ro
     ports:
       - "127.0.0.1:8501:8501"
     depends_on:

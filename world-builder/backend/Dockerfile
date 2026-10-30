@@ -13,5 +13,4 @@ COPY app ./app
 
 EXPOSE 8000
 
-# One process on purpose: the background job registry lives in its memory.
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
