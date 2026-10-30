@@ -63,14 +63,14 @@ def render_tile(asset: Dict, targets: List[str]) -> None:
             width='stretch',
         )
         confirmed = st.checkbox("Confirm delete", key=f"confirm_{path}")
-        if st.button("Delete", type="primary", disabled=not confirmed, key=f"delete_{path}", width='stretch'):
+        if st.button("Delete", icon=":material/delete:", disabled=not confirmed, key=f"delete_{path}", width='stretch'):
             stay_on(tab)
             api.delete("/assets", path=path)
             st.rerun()
 
 
 def render_assets(world: str, asset_type: str, targets: List[str]) -> None:
-    if st.button(f"＋ Create a {asset_type}", key=f"create_{asset_type}", type="primary"):
+    if st.button(f"Create a {asset_type}", icon=":material/add:", key=f"create_{asset_type}", type="primary"):
         st.session_state.create_type = asset_type
         st.switch_page("pages/create.py")
     assets = api.get("/assets", world=world, asset_type=asset_type)['assets']
@@ -88,7 +88,7 @@ def render_episodes(world: str) -> None:
     suggested = f"episode{len(episodes) + 1}"
     name_col, button_col = st.columns([3, 1])
     name = name_col.text_input("New episode", placeholder=suggested, label_visibility='collapsed')
-    if button_col.button("＋ Create episode", type="primary", width='stretch'):
+    if button_col.button("Create episode", icon=":material/add:", type="primary", width='stretch'):
         stay_on("Episodes")
         try:
             created = api.post(f"/worlds/{world}/episodes", json={'name': name or suggested})['name']
@@ -115,7 +115,7 @@ def render_episodes(world: str) -> None:
                 f"All {episode['scene_count']} scenes and every shot image in **{episode['name']}** "
                 "will be lost. This cannot be undone."
             )
-            if st.button("Delete episode", type="primary", key=f"delete_episode_{episode['name']}"):
+            if st.button("Delete episode", icon=":material/delete:", key=f"delete_episode_{episode['name']}"):
                 stay_on("Episodes")
                 api.delete(f"/worlds/{world}/episodes/{episode['name']}")
                 notify('success', f"Deleted episode **{episode['name']}**.")
@@ -125,7 +125,7 @@ def main() -> None:
     world, payload = render_world_switcher()
     targets = [entry['name'] for entry in payload['worlds'] if entry['name'] != world]
 
-    st.title(f"🌍 {world}")
+    st.title(world)
     show_notice()
 
     tab_names = [*ASSET_TABS.values(), "Episodes"]

@@ -29,11 +29,11 @@ def render_style_editor(world: str) -> None:
         st.caption("No style yet: generation is disabled until you write one.")
 
 
-def render_world_switcher(link: bool = True) -> Tuple[str, Dict]:
+def render_world_switcher() -> Tuple[str, Dict]:
     """Draw the picker and the style editor, and return the active world plus the ``/worlds`` payload.
 
     The selectbox has no ``key`` so pages can assign ``current_world`` freely
-    (after a create, rename or delete). ``link=False`` hides the Worlds link.
+    (after a create, rename or delete). Manage worlds is in the page menu.
     """
     payload = api.get("/worlds")
     worlds = [world["name"] for world in payload["worlds"]]
@@ -44,8 +44,6 @@ def render_world_switcher(link: bool = True) -> Tuple[str, Dict]:
 
     with st.sidebar:
         chosen = st.selectbox("World", worlds, index=worlds.index(current))
-        if link:
-            st.page_link("pages/worlds.py", label="Manage worlds", icon="🌍")
 
     if chosen != current:
         state = st.session_state
@@ -54,7 +52,6 @@ def render_world_switcher(link: bool = True) -> Tuple[str, Dict]:
         st.rerun()
 
     with st.sidebar:
-        st.divider()
         render_style_editor(chosen)
 
     return chosen, payload

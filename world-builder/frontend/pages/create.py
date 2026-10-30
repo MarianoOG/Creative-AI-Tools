@@ -60,9 +60,9 @@ def main() -> None:
     options = api.options()
     world, _ = render_world_switcher()
 
-    st.title("✨ Create an asset")
+    st.title("Create an asset")
     st.caption(f"Generating into **{world}**, in the style from the sidebar.")
-    if st.button("← Back to the world"):
+    if st.button("Back to the world", icon=":material/arrow_back:"):
         st.switch_page("pages/world.py")
 
     st.divider()

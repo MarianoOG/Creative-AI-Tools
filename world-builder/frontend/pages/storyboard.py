@@ -110,7 +110,7 @@ def render_shot(shot: Dict, prefix: str, number: int) -> Dict[str, bool]:
 
 def main() -> None:
     world, _ = render_world_switcher()
-    st.title("🎬 Storyboard")
+    st.title("Storyboard")
     episode = pick_episode(world)
     if not episode:
         return
@@ -119,7 +119,7 @@ def main() -> None:
     if not scene:
         return
     show_notice()
-    if st.button("← Back to the script"):
+    if st.button("Back to the script", icon=":material/arrow_back:"):
         st.switch_page("pages/episode.py")
 
     names = asset_names(world)
@@ -143,7 +143,7 @@ def main() -> None:
         st.divider()
         actions[shot['id']] = render_shot(shot, prefix, number)
     st.divider()
-    add_clicked = st.button("＋ Add shot")
+    add_clicked = st.button("Add shot", icon=":material/add:")
 
     for unassigned in scene['unassigned']:
         st.image(str(api.file_path(unassigned['path'])), caption=f"Not linked to a shot: {unassigned['label']}", width=300)

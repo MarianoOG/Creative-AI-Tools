@@ -56,7 +56,7 @@ def render_world_row(entry: Dict, active: bool) -> None:
     with delete_col:
         st.caption(f"Deletes {world}, its {plural(count)} and every episode. This cannot be undone.")
         confirmed = st.checkbox("Confirm delete", key=f"confirm_world_{world}")
-        if st.button("Delete", type="primary", key=f"delete_world_{world}", disabled=not confirmed):
+        if st.button("Delete", icon=":material/delete:", key=f"delete_world_{world}", disabled=not confirmed):
             try:
                 api.delete(f"/worlds/{world}")
             except api.ApiError as exc:
@@ -68,16 +68,16 @@ def render_world_row(entry: Dict, active: bool) -> None:
 
 
 def main() -> None:
-    active, payload = render_world_switcher(link=False)
+    active, payload = render_world_switcher()
 
-    st.title("🌍 Worlds")
+    st.title("Worlds")
     st.caption(
         "A world has one style (its style.txt) and owns its characters, "
         "locations, objects and episodes."
     )
     show_notice()
 
-    if st.button("← Back to the world"):
+    if st.button("Back to the world", icon=":material/arrow_back:"):
         st.switch_page("pages/world.py")
 
     st.divider()

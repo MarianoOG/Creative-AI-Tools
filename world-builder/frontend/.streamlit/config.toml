@@ -1,0 +1,80 @@
+# Streamlit config for the World Builder UI.
+# Colors, type and shape follow the MarianoOG design system (dark grey, with light).
+# Streamlit reads this file when you run `streamlit run app.py` from frontend/.
+
+[browser]
+# Turns off "Collecting usage statistics..." and the telemetry behind it.
+gatherUsageStats = false
+
+[client]
+# Hides the Deploy button; the menu keeps rerun, settings and print.
+toolbarMode = "minimal"
+
+[server]
+# Serves frontend/static/ at app/static/, for the bundled fonts below.
+enableStaticServing = true
+
+[theme]
+base = "dark"
+
+# Ground, surfaces, hairlines
+backgroundColor = "#0e0e10"           # background (grey-950)
+secondaryBackgroundColor = "#161618"  # surface (grey-900): inputs, code, expanders
+borderColor = "#2c2c30"               # border (grey-700)
+showWidgetBorder = true
+
+# Text
+textColor = "#ededee"                 # foreground (grey-100)
+linkColor = "#3b82f6"                 # link (key, blue-500)
+linkUnderline = true
+
+# Checkboxes, radios, sliders and secondary-button hovers. Primary buttons get
+# the near-white `primary` fill from the styles in app.py, because Streamlit
+# always draws their text in white.
+primaryColor = "#67676f"              # border-strong (grey-600)
+
+# Blue and amber only as functional light: links, st.info / st.warning and :blue[] / :orange[]
+blueColor = "#3b82f6"                 # key (blue-500)
+orangeColor = "#f59e0b"               # counter (amber-500)
+yellowColor = "#f59e0b"
+
+# Code blocks sit one step up from the surface
+codeBackgroundColor = "#202023"       # surface-raised (grey-800)
+codeTextColor = "#ededee"             # foreground, instead of Streamlit's green
+
+# Type: IBM Plex Sans and IBM Plex Mono, bundled in static/fonts/ (works offline)
+font = "IBM Plex Sans"
+headingFont = "IBM Plex Sans"
+codeFont = "IBM Plex Mono"
+baseFontSize = 16                     # body
+baseFontWeight = 400
+# h1 st.title, h2 st.header -> title 28 | h3 st.subheader, h4 -> heading 18 | h5 body 16 | h6 small 14
+headingFontSizes = ["28px", "28px", "18px", "18px", "16px", "14px"]
+headingFontWeights = 600
+
+# Shape: radius-sm (8px) for controls and buttons
+baseRadius = "8px"
+buttonRadius = "8px"
+
+# Hairline between the sidebar and the page
+showSidebarBorder = true
+
+[theme.sidebar]
+backgroundColor = "#161618"           # surface (grey-900)
+secondaryBackgroundColor = "#202023"  # surface-raised (grey-800): inputs in the sidebar
+borderColor = "#2c2c30"
+
+[[theme.fontFaces]]
+family = "IBM Plex Sans"
+url = "app/static/fonts/IBMPlexSans-Regular.woff2"
+weight = 400
+
+[[theme.fontFaces]]
+family = "IBM Plex Sans"
+url = "app/static/fonts/IBMPlexSans-SemiBold.woff2"
+weight = 600
+
+[[theme.fontFaces]]
+family = "IBM Plex Mono"
+url = "app/static/fonts/IBMPlexMono-Regular.woff2"
+weight = 400

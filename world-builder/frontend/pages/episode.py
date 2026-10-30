@@ -28,7 +28,7 @@ def render_header(world: str, episode: str, script: Dict) -> None:
         synopsis = st.text_area("Synopsis", value=script['synopsis'], key=f"synopsis_{episode}")
         if st.button("Save", key=f"save_header_{episode}"):
             save(world, episode, {**script, 'title': title, 'synopsis': synopsis}, "Saved.")
-    st.title(f"📜 {script['title']}")
+    st.title(script['title'])
     if script['synopsis']:
         st.write(f"*{script['synopsis']}*")
 
@@ -48,7 +48,7 @@ def render_scene(world: str, episode: str, script: Dict, index: int, names: Dict
     scene = script['scenes'][index]
     heading_col, open_col = st.columns([4, 1])
     heading_col.subheader(f"{index + 1}. {scene['heading'] or scene['id']}")
-    if open_col.button("🎬 Storyboard", key=f"open_{scene['id']}", width='stretch'):
+    if open_col.button("Storyboard", icon=":material/movie:", key=f"open_{scene['id']}", width='stretch'):
         open_storyboard(scene['id'])
     if scene['summary']:
         st.write(scene['summary'])
@@ -65,7 +65,7 @@ def render_scene(world: str, episode: str, script: Dict, index: int, names: Dict
             save(world, episode, {**script, 'scenes': scenes}, f"Saved **{scene['id']}**.")
     with delete_col.popover("Delete", width='stretch'):
         st.warning(f"All {len(scene['shots'])} shots of **{scene['id']}** and their images will be lost.")
-        if st.button("Delete scene", type="primary", key=f"delete_{scene['id']}"):
+        if st.button("Delete scene", icon=":material/delete:", key=f"delete_{scene['id']}"):
             api.delete(f"{episode_url(world, episode)}/scenes/{scene['id']}")
             notify('success', f"Deleted **{scene['id']}**.")
 
@@ -73,7 +73,7 @@ def render_scene(world: str, episode: str, script: Dict, index: int, names: Dict
 def render_new_scene(world: str, episode: str, count: int) -> None:
     name_col, button_col = st.columns([3, 1])
     name = name_col.text_input("New scene", placeholder=f"scene{count + 1}", label_visibility='collapsed')
-    if button_col.button("＋ Add scene", type="primary", width='stretch'):
+    if button_col.button("Add scene", icon=":material/add:", type="primary", width='stretch'):
         try:
             created = api.post(f"{episode_url(world, episode)}/scenes", json={'name': name or f"scene{count + 1}"})
         except api.ApiError as exc:
