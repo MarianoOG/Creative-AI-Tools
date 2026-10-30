@@ -2,7 +2,7 @@
 
 AI tools for visual creative media (images and video): tools that generate
 media, and tools that analyse it. Each folder is a standalone tool with its own
-README, dependencies and virtual environment.
+README, dependencies and virtual environment. 
 
 | Tool | What it does | Shape |
 | --- | --- | --- |
