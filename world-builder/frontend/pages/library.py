@@ -12,7 +12,7 @@ import api
 from shared.state import notify, show_notice
 from shared.worlds import render_world_switcher
 
-CREATE_PAGE = "views/assets/create.py"
+CREATE_PAGE = "pages/create.py"
 COLUMNS = 4
 PAGE_SIZE = 24
 ALL = "All"

@@ -136,7 +136,7 @@ def main() -> None:
         "reference sheets; scenes are finished frames."
     )
     if st.button("← Back to library"):
-        st.switch_page("views/assets/library.py")
+        st.switch_page("pages/library.py")
 
     st.divider()
     fields = render_form(options)

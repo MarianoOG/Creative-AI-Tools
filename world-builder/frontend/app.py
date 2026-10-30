@@ -12,9 +12,9 @@ init_session_state()
 
 pages = {
     "Assets": [
-        st.Page("views/assets/library.py", title="Asset Library", icon="🎨", default=True),
-        st.Page("views/assets/create.py", title="Create", icon="✨"),
-        st.Page("views/assets/worlds.py", title="Worlds", icon="🌍"),
+        st.Page("pages/library.py", title="Asset Library", icon="🎨", default=True),
+        st.Page("pages/create.py", title="Create", icon="✨"),
+        st.Page("pages/worlds.py", title="Worlds", icon="🌍"),
     ],
 }
 

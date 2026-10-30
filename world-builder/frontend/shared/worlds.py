@@ -30,7 +30,7 @@ def render_world_switcher(link: bool = True) -> Tuple[str, Dict]:
             "from the world it is generated into.",
         )
         if link:
-            st.page_link("views/assets/worlds.py", label="Manage worlds", icon="🌍")
+            st.page_link("pages/worlds.py", label="Manage worlds", icon="🌍")
 
     if chosen != current:
         # Forget what belonged to the old world: scene references and ticked tiles.

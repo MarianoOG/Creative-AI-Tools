@@ -74,7 +74,7 @@ def main() -> None:
     show_notice()
 
     if st.button("← Back to library"):
-        st.switch_page("views/assets/library.py")
+        st.switch_page("pages/library.py")
 
     st.divider()
     render_create()
