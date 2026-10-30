@@ -1,4 +1,4 @@
-"""Asset library and generation. Every path in and out is relative to the data folder."""
+"""Characters, objects and locations: listing, generation, moves. Every path in and out is relative to the data folder."""
 
 from __future__ import annotations
 
@@ -10,10 +10,10 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from app.assets.generation import ASPECT_RATIOS, PROVIDERS, QUALITY, generate_asset
-from app.assets.library import REFERENCE_TYPES, facets, is_asset, list_assets, parse_asset
+from app.assets.library import is_asset, list_assets, parse_asset
 from app.assets.prompt_manager import ASSET_DIRS, STYLES, build_prompt
-from app.assets.worlds import DEFAULT_WORLD, list_worlds, slugify, transfer_asset
-from app.settings import DATA_DIR, resolve
+from app.assets.worlds import DEFAULT_WORLD, list_worlds, read_style, slugify, transfer_asset, world_dir
+from app.settings import resolve
 
 router = APIRouter(prefix="/assets", tags=["assets"])
 
@@ -42,11 +42,10 @@ def _check_world(world: str) -> None:
 
 @router.get("/options")
 def options() -> Dict:
-    """Everything the Create form offers. ``None`` in ``styles`` means "follow the references"."""
+    """What the forms offer. ``styles`` are the presets a new world can start from."""
     return {
         "asset_types": list(ASSET_DIRS),
-        "reference_types": list(REFERENCE_TYPES),
-        "styles": list(STYLES) + [None],
+        "styles": STYLES,
         "aspect_ratios": list(ASPECT_RATIOS),
         "qualities": list(QUALITY),
         "default_world": DEFAULT_WORLD,
@@ -54,19 +53,11 @@ def options() -> Dict:
 
 
 @router.get("")
-def get_assets(
-    world: Optional[str] = None,
-    asset_type: Optional[str] = None,
-    style: Optional[str] = None,
-    provider: Optional[str] = None,
-) -> Dict:
-    """One world's assets (or every world's), newest first. ``facets`` ignore the filters."""
+def get_assets(world: Optional[str] = None, asset_type: Optional[str] = None) -> Dict:
+    """One world's characters, objects and locations (or every world's), newest first."""
     if asset_type is not None and asset_type not in ASSET_DIRS:
         raise HTTPException(400, f"unknown asset type: {asset_type}")
-    everything = list_assets(world)
-    wanted = {"asset_type": asset_type, "style": style, "provider": provider}
-    visible = [a for a in everything if all(v is None or a[k] == v for k, v in wanted.items())]
-    return {"assets": visible, "facets": facets(everything), "total": len(everything)}
+    return {"assets": list_assets(world, asset_type)}
 
 
 @router.delete("", status_code=204)
@@ -90,29 +81,17 @@ def transfer(request: TransferRequest) -> Dict:
     return {"done": done, "failed": failed}
 
 
-@router.post("/generate")
-def generate(
-    asset_type: Annotated[str, Form()],
-    name: Annotated[str, Form()],
-    description: Annotated[str, Form()],
-    world: Annotated[str, Form()] = DEFAULT_WORLD,
-    style: Annotated[Optional[str], Form()] = None,
-    aspect_ratio: Annotated[str, Form()] = "landscape",
-    quality: Annotated[str, Form()] = "low",
-    provider: Annotated[str, Form()] = "both",
-    references: Annotated[List[str], Form()] = [],
-    uploads: Annotated[List[UploadFile], File()] = [],
-) -> Dict:
-    """Generate one asset and return what was saved. Takes as long as the providers do.
+def save_renders(results: Dict, asset_type: str, world: str) -> Dict:
+    """Turn ``generate_asset`` results into a response; 502 only if every provider failed."""
+    assets = [parse_asset(path, asset_type, world) for path in results.values() if isinstance(path, Path)]
+    errors = "; ".join(f"{p}: {exc}" for p, exc in results.items() if isinstance(exc, Exception))
+    if not assets:
+        raise HTTPException(502, errors)
+    # With provider="both", one provider may fail while the other image is saved.
+    return {"assets": assets, "warning": errors or None}
 
-    Leave ``style`` out to take the art style from the references. Characters,
-    objects and locations take ``uploads`` (never saved); scenes take
-    ``references``, paths of existing assets in the same world.
-    """
-    slug = slugify(name)
-    if not slug:
-        raise HTTPException(422, "That name has no usable characters - try letters or digits.")
-    _check_world(world)
+
+def check_render_options(aspect_ratio: str, quality: str, provider: str) -> None:
     if aspect_ratio not in ASPECT_RATIOS:
         raise HTTPException(422, f"aspect_ratio must be one of {sorted(ASPECT_RATIOS)}")
     if quality not in QUALITY:
@@ -120,16 +99,32 @@ def generate(
     if provider not in (*PROVIDERS, "both"):
         raise HTTPException(422, "provider must be 'openai', 'gemini' or 'both'")
 
-    library_refs = [_library_path(path) for path in references]
-    for path in library_refs:
-        if not path.is_relative_to(DATA_DIR / world):
-            raise HTTPException(
-                422,
-                f"reference {path.name} belongs to another world; an asset in "
-                f"{world!r} can only be built from {world!r} references",
-            )
+
+@router.post("/generate")
+def generate(
+    asset_type: Annotated[str, Form()],
+    name: Annotated[str, Form()],
+    description: Annotated[str, Form()],
+    world: Annotated[str, Form()] = DEFAULT_WORLD,
+    aspect_ratio: Annotated[str, Form()] = "landscape",
+    quality: Annotated[str, Form()] = "low",
+    provider: Annotated[str, Form()] = "both",
+    uploads: Annotated[List[UploadFile], File()] = [],
+) -> Dict:
+    """Generate one character, object or location in the world's style. Takes as long as the providers do.
+
+    ``uploads`` are inspiration references, used for the call and never saved.
+    """
+    slug = slugify(name)
+    if not slug:
+        raise HTTPException(422, "That name has no usable characters - try letters or digits.")
+    _check_world(world)
+    check_render_options(aspect_ratio, quality, provider)
+    if asset_type not in ASSET_DIRS:
+        raise HTTPException(422, f"asset_type must be one of {sorted(ASSET_DIRS)}")
+    style = read_style(world)
     try:
-        build_prompt(asset_type, description, style, with_references=bool(library_refs or uploads))
+        build_prompt(asset_type, description, style, with_references=bool(uploads))
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
 
@@ -146,16 +141,10 @@ def generate(
             slug,
             description.strip(),
             style,
-            references=library_refs + upload_refs,
+            world_dir(world) / ASSET_DIRS[asset_type],
+            references=upload_refs,
             aspect_ratio=aspect_ratio,
             quality=quality,
             provider=provider,
-            world=world,
         )
-
-    assets = [parse_asset(path, asset_type, world) for path in results.values() if isinstance(path, Path)]
-    errors = "; ".join(f"{p}: {exc}" for p, exc in results.items() if isinstance(exc, Exception))
-    if not assets:
-        raise HTTPException(502, errors)
-    # With provider="both", one provider may fail while the other image is saved.
-    return {"assets": assets, "warning": errors or None}
+    return save_renders(results, asset_type, world)

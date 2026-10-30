@@ -13,6 +13,9 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 #: Defaults to ``data/`` at the repository root.
 DATA_DIR = Path(os.environ.get("DATA_DIR") or Path(__file__).resolve().parents[3] / "data").resolve()
 
+#: One folder per world.
+WORLDS_DIR = DATA_DIR / "assets"
+
 
 def relative(path: Path) -> str:
     """A path as the frontend sees it: relative to ``DATA_DIR``."""
