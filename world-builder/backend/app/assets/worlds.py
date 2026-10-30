@@ -1,6 +1,8 @@
-"""Worlds: the folders under ``DATA_DIR``, each holding one setting's assets.
+"""Worlds: the folders under ``WORLDS_DIR``, each holding one setting's style, assets and episodes.
 
-    <DATA_DIR>/<world>/<asset-type-dir>/<file>
+    <WORLDS_DIR>/<world>/style.txt
+    <WORLDS_DIR>/<world>/<asset-type-dir>/<file>
+    <WORLDS_DIR>/<world>/episodes/...            (see story.py)
 """
 
 from __future__ import annotations
@@ -10,14 +12,16 @@ import shutil
 from pathlib import Path
 from typing import List
 
-from app.settings import DATA_DIR
+from app.assets.prompt_manager import ASSET_DIRS
+from app.settings import WORLDS_DIR
 
 #: The world listed when there is none on disk yet.
 DEFAULT_WORLD = "default"
+STYLE_FILE = "style.txt"
 
 
 def slugify(name: str) -> str:
-    """Reduce a typed name to a safe path segment (used for worlds and asset names)."""
+    """Reduce a typed name to a safe path segment (used for worlds, episodes, scenes and asset names)."""
     return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
 
 
@@ -25,15 +29,27 @@ def world_dir(world: str) -> Path:
     """The folder for one world. Anything that is not already a slug (``..``, ``a/b``) is refused."""
     if not world or world != slugify(world):
         raise ValueError(f"not a usable world name: {world!r}")
-    return DATA_DIR / world
+    return WORLDS_DIR / world
 
 
 def list_worlds() -> List[str]:
     """Every world on disk, alphabetically. Never empty: falls back to the default world."""
-    if not DATA_DIR.is_dir():
+    if not WORLDS_DIR.is_dir():
         return [DEFAULT_WORLD]
-    worlds = sorted(p.name for p in DATA_DIR.iterdir() if p.is_dir() and not p.name.startswith("."))
+    worlds = sorted(p.name for p in WORLDS_DIR.iterdir() if p.is_dir() and not p.name.startswith("."))
     return worlds or [DEFAULT_WORLD]
+
+
+def read_style(world: str) -> str:
+    """The world's visual style, or ``""`` if it has none yet."""
+    path = world_dir(world) / STYLE_FILE
+    return path.read_text().strip() if path.is_file() else ""
+
+
+def write_style(world: str, style: str) -> None:
+    directory = world_dir(world)
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / STYLE_FILE).write_text(style.strip() + "\n")
 
 
 def _new_world_dir(name: str) -> Path:
@@ -46,10 +62,11 @@ def _new_world_dir(name: str) -> Path:
     return directory
 
 
-def create_world(name: str) -> str:
-    """Make a new, empty world and return its slug."""
+def create_world(name: str, style: str = "") -> str:
+    """Make a new world with its style file and return its slug."""
     directory = _new_world_dir(name)
     directory.mkdir(parents=True)
+    write_style(directory.name, style)
     return directory.name
 
 
@@ -81,6 +98,8 @@ def transfer_asset(path: Path, target_world: str, copy: bool = False) -> Path:
     A name already taken in the target is refused rather than suffixed, which
     would break the filename parse.
     """
+    if path.parent.name not in ASSET_DIRS.values():
+        raise ValueError("only characters, objects and locations move between worlds")
     destination = world_dir(target_world) / path.parent.name / path.name
     if destination == path:
         raise ValueError(f"already in {target_world}")

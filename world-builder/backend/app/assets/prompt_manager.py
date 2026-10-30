@@ -1,21 +1,18 @@
-"""Prompt composition for the four asset types. Pure data plus :func:`build_prompt`, no I/O.
+"""Prompt composition for characters, objects, locations and storyboard shots. Pure data plus :func:`build_prompt`, no I/O.
 
 A prompt is ``description -> style clause -> framing -> reference clause``.
 Framing comes after the style, so it has the last word on layout and lighting.
-``style=None`` takes the art style from the reference images instead, and swaps
-in clauses that say so.
+The style clause is the world's ``style.txt``; :data:`STYLES` are the presets
+new worlds start from.
 """
 
 from __future__ import annotations
 
-from typing import Optional
-
 #: Asset type -> the folder its files live in, inside a world.
 ASSET_DIRS: dict[str, str] = {
     "character": "characters",
-    "object": "objects",
     "location": "locations",
-    "scene": "scenes",
+    "object": "objects",
 }
 
 #: Written long on purpose: a one-word label ("anime") gives the model too little to go on.
@@ -99,18 +96,8 @@ STYLES: dict[str, str] = {
     ),
 }
 
-#: The filename's style slot for a ``style=None`` render. Not a :data:`STYLES` key.
-REFERENCE_STYLE_SLUG = "follow_references"
-
-#: Stands in for the :data:`STYLES` clause when ``style`` is ``None``.
-FOLLOW_REFERENCES_CLAUSE = (
-    "Do not apply any predetermined art style to this image. The art style is "
-    "defined entirely by the attached reference images: match their medium, "
-    "linework, shading, colour palette, level of detail and finish so closely "
-    "that this image could sit in the same production as them. Invent no "
-    "stylistic treatment of your own, and do not modernise, tidy up or raise "
-    "the fidelity of what the references show."
-)
+#: Style slots older filenames carry (``{name}_{style}_{uuid8}_{provider}``). New files have none.
+LEGACY_STYLE_SLUGS = (*STYLES, "follow_references")
 
 # Characters and objects are reference sheets for later animation steps, so
 # their layout is fixed here. Locations are empty background plates.
@@ -138,8 +125,8 @@ OBJECT_FRAMING = (
     "text, no labels, no dimension lines, no borders."
 )
 
-# Location and scene framings are split around their one lighting sentence,
-# which some styles swap out (see STYLE_FRAMING and FOLLOW_FRAMING).
+# Location and shot framings are split around their one lighting sentence,
+# which line-only styles swap out (see MONOCHROME_FRAMING).
 _LOCATION_COMPOSITION = (
     "Render this as an empty background plate for animation. The environment is "
     "completely unoccupied: no characters, no people, no figures, no crowds, no "
@@ -149,14 +136,14 @@ _LOCATION_COMPOSITION = (
 )
 _LOCATION_TAIL = "No text, no signage lettering, no watermarks, no borders."
 
-_SCENE_COMPOSITION = (
+_SHOT_COMPOSITION = (
     "Render this as a single finished composed frame depicting the situation "
     "described above. Compose it cinematically with a clear focal subject, a "
     "readable staging of every element mentioned, and depth between foreground, "
     "midground and background. Keep the characters, objects and environment "
     "exactly consistent with their reference designs. "
 )
-_SCENE_TAIL = "No text, no captions, no borders."
+_SHOT_TAIL = "No text, no captions, no borders."
 
 #: For line-only styles, where a lighting or colour-grade sentence would contradict the style.
 _MONOCHROME_RENDERING = (
@@ -172,20 +159,18 @@ FRAMING: dict[str, str] = {
     + "Light the environment as a usable backdrop, readable across the whole "
     "frame with nothing blown out and nothing crushed to black. "
     + _LOCATION_TAIL,
-    "scene": _SCENE_COMPOSITION + "Unified lighting and colour grade across the whole frame. " + _SCENE_TAIL,
+    "shot": _SHOT_COMPOSITION + "Unified lighting and colour grade across the whole frame. " + _SHOT_TAIL,
 }
 
-#: ``(style, asset_type)`` -> a framing that replaces :data:`FRAMING` for that pair.
-STYLE_FRAMING: dict[tuple[str, str], str] = {
-    ("ligne_claire_lineart", "location"): _LOCATION_COMPOSITION + _MONOCHROME_RENDERING + _LOCATION_TAIL,
-    ("ligne_claire_lineart", "scene"): _SCENE_COMPOSITION + _MONOCHROME_RENDERING + _SCENE_TAIL,
+#: Framings for line-only styles. Matched on the exact preset text, so an edited style.txt gets the default framing.
+MONOCHROME_FRAMING: dict[str, str] = {
+    "location": _LOCATION_COMPOSITION + _MONOCHROME_RENDERING + _LOCATION_TAIL,
+    "shot": _SHOT_COMPOSITION + _MONOCHROME_RENDERING + _SHOT_TAIL,
 }
-
-#: Framing overrides for ``style=None``: a scene keeps each element's own look, so no unified grade.
-FOLLOW_FRAMING: dict[str, str] = {"scene": _SCENE_COMPOSITION + _SCENE_TAIL}
+_MONOCHROME_STYLES = {STYLES["ligne_claire_lineart"]}
 
 #: How references are used. Characters, objects and locations take them as
-#: inspiration (never for the style); scenes take them as designs to reproduce.
+#: inspiration (never for the style); shots take them as designs to reproduce.
 REFERENCE_CLAUSES: dict[str, str] = {
     "character": (
         "Reference images are provided as inspiration, not as something to copy. "
@@ -225,7 +210,7 @@ REFERENCE_CLAUSES: dict[str, str] = {
         "defined by the style description above and overrides the rendering of the "
         "references."
     ),
-    "scene": (
+    "shot": (
         "Use the attached reference images as the authority for this frame. They "
         "are fact, not inspiration: reproduce the identity, design, proportions, "
         "costume, materials and colour palette of every subject they depict "
@@ -238,62 +223,20 @@ REFERENCE_CLAUSES: dict[str, str] = {
     ),
 }
 
-#: Reference clauses for ``style=None``, where the references also set the style.
-_FOLLOW_SHEET_CLAUSE = (
-    "The reference images are the authority for how this image is drawn: "
-    "reproduce their medium, linework, shading, colour palette and level of "
-    "detail exactly. They are not the authority for what is drawn — the subject "
-    "described above is the subject, and must not be replaced by, or cloned from, "
-    "anything a reference happens to depict. Where the references disagree with "
-    "each other, follow the one whose subject is closest to the described one. "
-    "The framing rules above still win over anything the references show: a "
-    "background plate stays empty even if every reference is crowded with "
-    "characters, and a turnaround sheet keeps its white backdrop and its fixed "
-    "views even if the references are finished frames."
-)
 
-FOLLOW_REFERENCE_CLAUSES: dict[str, str] = {
-    "character": _FOLLOW_SHEET_CLAUSE,
-    "object": _FOLLOW_SHEET_CLAUSE,
-    "location": _FOLLOW_SHEET_CLAUSE,
-    "scene": (
-        "The reference images are the authority for this frame twice over: for the "
-        "identity, design, proportions, costume and materials of every subject they "
-        "depict, and for how each one is drawn. Reproduce each element in the art "
-        "style of the reference it came from — its medium, linework, shading and "
-        "palette — rather than restyling it. Do not unify the elements into a single "
-        "house style or a single colour grade; where the references are drawn "
-        "differently, that difference is kept in this frame. Share only the staging "
-        "and the direction of the light, so the frame still reads as one image. "
-        "Ignore only the sheet layout of the references themselves (the multiple "
-        "views and the blank backdrop); their designs and their rendering carry over."
-    ),
-}
-
-
-def build_prompt(asset_type: str, description: str, style: Optional[str], with_references: bool = False) -> str:
-    """Compose the full prompt for one asset. For a scene, ``description`` is the situation to depict.
-
-    ``style=None`` takes the art style from the references, so it needs at least one.
-    """
+def build_prompt(asset_type: str, description: str, style: str, with_references: bool = False) -> str:
+    """Compose the full prompt for one image. For a shot, ``description`` is the situation to depict."""
     if asset_type not in FRAMING:
         raise ValueError(f"asset_type must be one of {sorted(FRAMING)}, got {asset_type!r}")
-    if style is not None and style not in STYLES:
-        raise ValueError(f"style must be None or one of {sorted(STYLES)}, got {style!r}")
+    if not style.strip():
+        raise ValueError("this world has no style yet - write one in style.txt (sidebar)")
     if not description.strip():
         raise ValueError("description must not be empty")
 
-    if style is None:
-        if not with_references:
-            raise ValueError(
-                "style None takes its style from the reference images, so at least "
-                "one reference image is required"
-            )
-        style_clause, framing, clauses = FOLLOW_REFERENCES_CLAUSE, FOLLOW_FRAMING.get(asset_type), FOLLOW_REFERENCE_CLAUSES
-    else:
-        style_clause, framing, clauses = STYLES[style], STYLE_FRAMING.get((style, asset_type)), REFERENCE_CLAUSES
-
-    parts = [description.strip(), style_clause, framing or FRAMING[asset_type]]
+    framing = FRAMING[asset_type]
+    if style.strip() in _MONOCHROME_STYLES:
+        framing = MONOCHROME_FRAMING.get(asset_type, framing)
+    parts = [description.strip(), style.strip(), framing]
     if with_references:
-        parts.append(clauses[asset_type])
+        parts.append(REFERENCE_CLAUSES[asset_type])
     return "\n\n".join(parts)

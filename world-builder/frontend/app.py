@@ -11,10 +11,16 @@ st.set_page_config(page_title="World Builder", page_icon="🌍", layout="wide")
 init_session_state()
 
 pages = {
-    "Assets": [
-        st.Page("pages/library.py", title="Asset Library", icon="🎨", default=True),
-        st.Page("pages/create.py", title="Create", icon="✨"),
-        st.Page("pages/worlds.py", title="Worlds", icon="🌍"),
+    "World": [
+        st.Page("pages/world.py", title="World", icon="🌍", default=True),
+        st.Page("pages/create.py", title="Create asset", icon="✨"),
+    ],
+    "Story": [
+        st.Page("pages/episode.py", title="Episode script", icon="📜"),
+        st.Page("pages/storyboard.py", title="Storyboard", icon="🎬"),
+    ],
+    "Settings": [
+        st.Page("pages/worlds.py", title="Manage worlds", icon="🗂️"),
     ],
 }
 

@@ -1,8 +1,8 @@
-"""The asset library: the file tree under ``DATA_DIR`` is the store, re-read on every listing.
+"""The asset library: the file tree under ``WORLDS_DIR`` is the store, re-read on every listing.
 
-Each file's metadata is in its name, ``{name}_{style}_{uuid8}_{provider}``, and
-its world and type are the two folders above it. Older files without the uuid
-still parse.
+Each file's metadata is in its name, ``{name}_{uuid8}_{provider}``, and its
+world and type are the folders above it. Older files carry a style slot
+(``{name}_{style}_{uuid8}_{provider}``) or no uuid, and still parse.
 """
 
 from __future__ import annotations
@@ -11,18 +11,15 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from app.assets.prompt_manager import ASSET_DIRS, REFERENCE_STYLE_SLUG, STYLES
+from app.assets.prompt_manager import ASSET_DIRS, LEGACY_STYLE_SLUGS
 from app.assets.worlds import list_worlds
-from app.settings import DATA_DIR, relative
+from app.settings import WORLDS_DIR, relative, resolve
 
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 
-#: The types a scene can use as references.
-REFERENCE_TYPES = ("character", "object", "location")
-
 _UID_RE = re.compile(r"^[0-9a-f]{8}$")
 #: Longest first, so `watercolor_storybook` wins over a shorter suffix.
-_STYLES_BY_LENGTH = sorted({*STYLES, REFERENCE_STYLE_SLUG}, key=len, reverse=True)
+_STYLES_BY_LENGTH = sorted(LEGACY_STYLE_SLUGS, key=len, reverse=True)
 _PROVIDERS = ("openai", "gemini")
 
 Asset = Dict[str, Any]
@@ -53,37 +50,44 @@ def parse_asset(path: Path, asset_type: str, world: str) -> Asset:
         "asset_type": asset_type,
         "world": world,
         "name": name,
-        "style": style,
         "provider": provider,
         "uid": uid,
         "mtime": path.stat().st_mtime,
-        "label": " · ".join(part for part in (name, style, provider) if part),
+        "label": " · ".join(part for part in (name, provider) if part),
     }
 
 
+def images_in(directory: Path) -> List[Path]:
+    if not directory.is_dir():
+        return []
+    return [p for p in directory.iterdir() if p.suffix.lower() in IMAGE_SUFFIXES and p.is_file()]
+
+
 def is_asset(path: Path) -> bool:
-    """Whether ``path`` (resolved) is a file in a world's asset-type folder."""
-    parts = path.relative_to(DATA_DIR).parts
-    return len(parts) == 3 and parts[1] in ASSET_DIRS.values() and path.is_file()
+    """Whether ``path`` (resolved) is an image in a world's asset-type folder or in a scene folder."""
+    if not path.is_relative_to(WORLDS_DIR) or not path.is_file():
+        return False
+    parts = path.relative_to(WORLDS_DIR).parts
+    asset_file = len(parts) == 3 and parts[1] in ASSET_DIRS.values()
+    shot_file = len(parts) == 5 and parts[1] == "episodes"
+    return (asset_file or shot_file) and path.suffix.lower() in IMAGE_SUFFIXES
 
 
-def list_assets(world: Optional[str] = None) -> List[Asset]:
-    """Every asset of one world (or of every world), newest first."""
+def list_assets(world: Optional[str] = None, asset_type: Optional[str] = None) -> List[Asset]:
+    """Every character, object and location of one world (or of every world), newest first."""
     assets = [
-        parse_asset(path, asset_type, world_name)
+        parse_asset(path, kind, world_name)
         for world_name in ([world] if world else list_worlds())
-        for asset_type, dir_name in ASSET_DIRS.items()
-        if (DATA_DIR / world_name / dir_name).is_dir()
-        for path in (DATA_DIR / world_name / dir_name).iterdir()
-        if path.suffix.lower() in IMAGE_SUFFIXES and path.is_file()
+        for kind, dir_name in ASSET_DIRS.items()
+        if asset_type in (None, kind)
+        for path in images_in(WORLDS_DIR / world_name / dir_name)
     ]
     return sorted(assets, key=lambda asset: asset["mtime"], reverse=True)
 
 
-def facets(assets: List[Asset]) -> Dict[str, List[str]]:
-    """The filter options a listing actually contains."""
-    return {
-        "asset_type": [t for t in ASSET_DIRS if any(a["asset_type"] == t for a in assets)],
-        "style": sorted({a["style"] for a in assets if a["style"]}),
-        "provider": sorted({a["provider"] for a in assets if a["provider"]}),
-    }
+def newest_by_name(world: str, asset_type: str) -> Dict[str, Path]:
+    """Asset name -> its newest file, so a reference is sent once and not once per provider."""
+    newest: Dict[str, Path] = {}
+    for asset in reversed(list_assets(world, asset_type)):
+        newest[asset["name"]] = resolve(asset["path"])
+    return newest

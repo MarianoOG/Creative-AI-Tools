@@ -1,8 +1,8 @@
 """Image generation with OpenAI (gpt-image-2) and Gemini (Nano Banana 2).
 
-Files are written to ``<DATA_DIR>/<world>/<asset-type-dir>/`` as
-``{name}_{style}_{uuid8}_{provider}``, with the extension of the returned bytes
-(OpenAI PNG, Gemini JPEG). Output is always 2K.
+Files are written to the folder the caller passes (an asset-type folder, or a
+scene folder for shots) as ``{name}_{uuid8}_{provider}``, with the extension of
+the returned bytes (OpenAI PNG, Gemini JPEG). Output is always 2K.
 """
 
 from __future__ import annotations
@@ -18,8 +18,7 @@ from typing import Any, Optional, Sequence
 
 from PIL import Image
 
-from app.assets.prompt_manager import ASSET_DIRS, REFERENCE_STYLE_SLUG, build_prompt
-from app.settings import DATA_DIR
+from app.assets.prompt_manager import build_prompt
 
 OPENAI_MODEL = "gpt-image-2"
 GEMINI_MODEL = "gemini-nano-banana-2.1"
@@ -119,14 +118,14 @@ def generate_asset(
     asset_type: str,
     name: str,
     description: str,
-    style: Optional[str],
+    style: str,
+    directory: Path,
     references: Sequence[Path] = (),
     aspect_ratio: str = "landscape",
     quality: str = "low",
     provider: str = "both",
-    world: str = "default",
 ) -> dict[str, Path | Exception]:
-    """Render one asset with one provider or ``"both"`` (concurrently).
+    """Render one image (an asset, or a ``"shot"``) into ``directory`` with one provider or ``"both"`` (concurrently).
 
     Returns ``{provider: Path}``; a provider that failed holds its exception
     instead, so one failure never discards the other image. A ``"both"`` run
@@ -136,7 +135,7 @@ def generate_asset(
     prompt = build_prompt(asset_type, description, style, with_references=bool(references))
     ratio = ASPECT_RATIOS[aspect_ratio]
     uid = uuid.uuid4().hex[:8]
-    stem = DATA_DIR / world / ASSET_DIRS[asset_type] / f"{name}_{style or REFERENCE_STYLE_SLUG}_{uid}"
+    stem = directory / f"{name}_{uid}"
     providers = PROVIDERS if provider == "both" else (provider,)
 
     with ThreadPoolExecutor(max_workers=len(providers)) as pool:

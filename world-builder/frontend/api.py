@@ -59,6 +59,10 @@ def patch(path: str, json: Dict) -> Any:
     return request("PATCH", path, json=json)
 
 
+def put(path: str, json: Dict) -> Any:
+    return request("PUT", path, json=json)
+
+
 def delete(path: str, **params: Any) -> Any:
     return request("DELETE", path, params=params)
 
@@ -70,5 +74,5 @@ def file_path(relative: str) -> Path:
 
 @st.cache_data(ttl=300, show_spinner=False)
 def options() -> Dict[str, List]:
-    """The Create form's options (styles, aspect ratios, ...)."""
+    """The form options (asset types, style presets, aspect ratios, ...)."""
     return get("/assets/options")
