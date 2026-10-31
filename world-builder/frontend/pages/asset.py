@@ -103,7 +103,7 @@ def render_variations(asset: Dict, provider: str) -> None:
     title_col, all_col = st.columns([3, 1])
     title_col.subheader("Views" if asset['asset_type'] == 'location' else "Variations")
     if variations and all_col.button("Regenerate all", width='stretch'):
-        with st.spinner(f"Regenerating {len(variations)} image(s), one after another... this can take a while."):
+        with st.spinner(f"Regenerating {len(variations)} image(s): the preferred one first, then the rest in parallel..."):
             try:
                 result = api.post("/assets/regenerate", json=body(asset, provider=provider))
             except api.ApiError as exc:
@@ -153,8 +153,8 @@ def render_new_views(asset: Dict, options: Dict, provider: str) -> None:
     first = options['location_views'][0]
     st.subheader("Missing views")
     st.caption(
-        f"Rendered one after another: {', '.join(missing)}. The {first} view comes from the description; "
-        "the others are drawn from it."
+        f"Rendered: {', '.join(missing)}. The {first} view comes from the description; "
+        "the others are drawn from it, in parallel."
     )
     uploads = []
     if first in missing:

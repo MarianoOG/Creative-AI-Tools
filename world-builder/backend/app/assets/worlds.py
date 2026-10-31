@@ -16,6 +16,7 @@ moves its folder into a hidden ``.deleted/`` folder next to it.
 from __future__ import annotations
 
 import json
+import os
 import re
 import uuid
 from pathlib import Path
@@ -177,6 +178,13 @@ def _normalise(raw: Dict) -> World:
     return world
 
 
+def write_json(path: Path, data: Any) -> None:
+    """Write ``data`` to ``path`` atomically, so a request reading it while a render saves never sees half a file."""
+    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex[:8]}.tmp")
+    temporary.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+    os.replace(temporary, path)
+
+
 def read_world(world: str) -> World:
     """The world's ``world.json``, written first if the world predates it."""
     directory = world_dir(world)
@@ -192,7 +200,7 @@ def save_world(world: str, raw: Dict) -> World:
     data = _normalise(raw)
     directory = world_dir(world)
     directory.mkdir(parents=True, exist_ok=True)
-    (directory / WORLD_FILE).write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+    write_json(directory / WORLD_FILE, data)
     return data
 
 

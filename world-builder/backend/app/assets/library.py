@@ -13,6 +13,7 @@ preferred variation, ``name:variation`` for a specific one.
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
@@ -24,6 +25,10 @@ Asset = Dict
 
 #: Uploaded reference images, kept so a variation can be regenerated with them.
 REFERENCES_DIR = "references"
+
+#: Held across each read-change-save of ``world.json``, so variations rendered in
+#: parallel never drop each other. A thread lock: the backend runs one process.
+_lock = threading.Lock()
 
 
 def image_path(world: str, asset_type: str, variation: Dict) -> Path:
@@ -79,12 +84,13 @@ def view_asset(world: str, asset_type: str, name: str) -> Asset:
 
 def _update(world: str, asset_type: str, name: str, change: Callable[[Asset], None]) -> None:
     """Re-read ``world.json``, apply ``change`` to one asset and save. Re-reading keeps edits made during a render."""
-    data = read_world(world)
-    asset = next((a for a in data[ASSET_DIRS[asset_type]] if a["name"] == name), None)
-    if asset is None:
-        raise ValueError(f"no {asset_type} called {name!r}")
-    change(asset)
-    save_world(world, data)
+    with _lock:
+        data = read_world(world)
+        asset = next((a for a in data[ASSET_DIRS[asset_type]] if a["name"] == name), None)
+        if asset is None:
+            raise ValueError(f"no {asset_type} called {name!r}")
+        change(asset)
+        save_world(world, data)
 
 
 def create_asset(world: str, asset_type: str, name: str, description: str) -> Asset:

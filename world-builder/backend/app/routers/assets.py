@@ -10,6 +10,7 @@ from the establishing view. Nothing here removes a file.
 from __future__ import annotations
 
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Annotated, Dict, List, Optional, Tuple
 
@@ -28,6 +29,8 @@ router = APIRouter(prefix="/assets", tags=["assets"])
 #: Asset types whose variations are named freely. Locations have their fixed views instead.
 VARIABLE_TYPES = ("character", "object")
 ESTABLISHING = next(iter(LOCATION_VIEWS))
+#: How many variations of one asset render at once. Provider rate limits are the ceiling.
+PARALLEL_RENDERS = 4
 
 
 class NewAsset(BaseModel):
@@ -151,16 +154,28 @@ def _render_and_save(world: str, asset_type: str, name: str, variation: str, cha
 
 
 def _render_many(world: str, asset_type: str, name: str, jobs: List[Tuple[str, str, List[Path]]],
-                 provider: str) -> Dict:
-    """Render ``(variation, change, uploads)`` jobs in order, each saved as it lands; stop at the first failure."""
-    warning = None
-    for variation, change, uploads in jobs:
+                 provider: str, anchor: Optional[str] = None) -> Dict:
+    """Render ``(variation, change, uploads)`` jobs, each saved as it lands.
+
+    The ``anchor`` job (the image the others are drawn from) renders first, on
+    its own; if it fails nothing else is tried. The rest render in parallel.
+    """
+    first = [job for job in jobs if job[0] == anchor]
+    rest = [job for job in jobs if job[0] != anchor]
+
+    def render(job: Tuple[str, str, List[Path]]) -> Optional[str]:
+        variation, change, uploads = job
         try:
             _render_and_save(world, asset_type, name, variation, change, provider, uploads)
         except HTTPException as exc:
-            warning = f"{variation} failed: {exc.detail}"
-            break
-    return {"asset": library.view_asset(world, asset_type, name), "warning": warning}
+            return f"{variation} failed: {exc.detail}"
+        return None
+
+    failures = [failure for failure in map(render, first) if failure]
+    if not failures and rest:
+        with ThreadPoolExecutor(max_workers=PARALLEL_RENDERS) as pool:
+            failures = [failure for failure in pool.map(render, rest) if failure]
+    return {"asset": library.view_asset(world, asset_type, name), "warning": "; ".join(failures) or None}
 
 
 @router.get("/options")
@@ -261,10 +276,10 @@ def add_views(
     provider: Annotated[str, Form()] = DEFAULT_PROVIDER,
     uploads: Annotated[List[UploadFile], File()] = [],
 ) -> Dict:
-    """Render every fixed view a location is missing, in order, one after another.
+    """Render every fixed view a location is missing: the establishing view first, when missing, then the rest in parallel.
 
     ``uploads`` go to the establishing view (when it is missing); the other
-    views are drawn from it. Views already made are kept if a later one fails.
+    views are drawn from it. Views already made are kept if another one fails.
     """
     _check(world, "location")
     check_provider(provider)
@@ -274,20 +289,21 @@ def add_views(
         raise HTTPException(409, f"{name!r} already has every view - regenerate one instead.")
     references = _keep_uploads(world, f"{name}-{ESTABLISHING}", uploads) if ESTABLISHING in missing else []
     jobs = [(view, "", references if view == ESTABLISHING else []) for view in missing]
-    return _render_many(world, "location", name, jobs, provider)
+    return _render_many(world, "location", name, jobs, provider, anchor=ESTABLISHING)
 
 
 @router.post("/regenerate")
 def regenerate(body: Regenerate) -> Dict:
     """Re-render one variation, or all of them, from the asset's current description and their saved references.
 
-    "All" goes in dependency order (the preferred image, or a location's
-    establishing view, first), so the others are drawn from its new render.
+    "All" renders the preferred image (or a location's establishing view)
+    first, so the others, rendered in parallel after it, are drawn from its new render.
     Each variation points at its new image; the old file stays on disk.
     """
     _check(body.world, body.asset_type)
     check_provider(body.provider)
     asset = _asset(body.world, body.asset_type, body.name)
+    first = None
     if body.variation is not None:
         if library.variation_named(asset, body.variation) is None:
             raise HTTPException(404, f"{body.name!r} has no variation called {body.variation!r}")
@@ -301,4 +317,4 @@ def regenerate(body: Regenerate) -> Dict:
     for variation_name in names:
         variation = library.variation_named(asset, variation_name)
         jobs.append((variation_name, variation["description"], library.reference_files(body.world, variation)))
-    return _render_many(body.world, body.asset_type, body.name, jobs, body.provider)
+    return _render_many(body.world, body.asset_type, body.name, jobs, body.provider, anchor=first)

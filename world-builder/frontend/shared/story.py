@@ -1,19 +1,51 @@
-"""Helpers shared by the Script and Storyboard pages: pickers and the scene editor."""
+"""Helpers shared by the Script and Storyboard pages: pickers, the scene editor and shot rendering."""
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Dict, List, Optional, Tuple
 
 import streamlit as st
 
 import api
+from shared.state import notify
 
 #: Script field -> the asset type its names refer to.
 REFERENCE_FIELDS = {'characters': 'character', 'locations': 'location', 'objects': 'object'}
 
+#: How many shots render at once. Provider rate limits are the ceiling.
+PARALLEL_RENDERS = 4
+
 
 def episode_url(world: str, episode: str) -> str:
     return f"/worlds/{world}/episodes/{episode}"
+
+
+def generate_shots(world: str, episode: str, shots: List[Tuple[str, str]], what: str,
+                   body: Optional[Dict] = None) -> None:
+    """Render each ``(scene, shot)`` frame, ``PARALLEL_RENDERS`` at a time, then leave a notice for the rerun.
+
+    Only the requests run in worker threads: Streamlit calls must stay on the
+    script's own thread, so progress is written here as each render lands.
+    """
+    warnings = []
+    with st.status(f"Generating {len(shots)} {what}(s), {PARALLEL_RENDERS} at a time... each can take a few minutes.") as status:
+        with ThreadPoolExecutor(max_workers=PARALLEL_RENDERS) as pool:
+            futures = {
+                pool.submit(api.post, f"{episode_url(world, episode)}/scenes/{scene_id}/shots/{shot_id}/generate", json=body):
+                    f"{scene_id}/{shot_id}"
+                for scene_id, shot_id in shots
+            }
+            for done, future in enumerate(as_completed(futures), start=1):
+                try:
+                    future.result()
+                    status.write(f"`{futures[future]}` done ({done}/{len(shots)}).")
+                except api.ApiError as exc:
+                    warnings.append(f"{futures[future]}: {exc}")
+                    status.write(f"`{futures[future]}` failed ({done}/{len(shots)}).")
+    if warnings:
+        notify('warning', f"Generated {len(shots) - len(warnings)} of {len(shots)} {what}(s). Failed: " + "; ".join(warnings))
+    notify('success', f"Generated {len(shots)} {what}(s).")
 
 
 def pick_episode(world: str) -> Optional[str]:

@@ -16,8 +16,8 @@ from typing import Dict, List, Tuple
 import streamlit as st
 
 import api
-from shared.state import notify, show_notice
-from shared.story import episode_url, pick_episode
+from shared.state import show_notice
+from shared.story import episode_url, generate_shots, pick_episode
 from shared.worlds import render_world_switcher
 
 COLUMNS = 3
@@ -46,24 +46,6 @@ def export_files(script: Dict) -> Tuple[Tuple[str, str], ...]:
                 suffix = Path(shot['final_path']).suffix
                 files.append((f"{scene_number:02}_{scene['id']}_{shot_number:02}_{shot['id']}{suffix}", shot['final_path']))
     return tuple(files)
-
-
-def generate(world: str, episode: str, shots: List[Tuple[str, str]], provider: str) -> None:
-    """Render each ``(scene, shot)`` final frame in turn, then rerun to show them."""
-    warnings = []
-    with st.status(f"Generating {len(shots)} high-fidelity frame(s)... each can take a few minutes.") as status:
-        for scene_id, shot_id in shots:
-            status.write(f"Rendering `{scene_id}` · `{shot_id}`...")
-            try:
-                api.post(
-                    f"{episode_url(world, episode)}/scenes/{scene_id}/shots/{shot_id}/generate",
-                    json={'final': True, 'provider': provider},
-                )
-            except api.ApiError as exc:
-                warnings.append(f"{scene_id}/{shot_id}: {exc}")
-    if warnings:
-        notify('warning', "Some renders failed: " + "; ".join(warnings))
-    notify('success', f"Generated {len(shots)} high-fidelity frame(s).")
 
 
 def render_grid(script: Dict) -> List[Tuple[str, str]]:
@@ -126,7 +108,7 @@ def main() -> None:
     clicked = render_grid(script)
     to_generate = missing if generate_all else clicked
     if to_generate:
-        generate(world, episode, to_generate, provider)
+        generate_shots(world, episode, to_generate, "high-fidelity frame", {'final': True, 'provider': provider})
 
 
 main()

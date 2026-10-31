@@ -20,7 +20,7 @@ import streamlit as st
 
 import api
 from shared.state import notify, show_notice
-from shared.story import asset_names, episode_url, pick_episode, references_markdown, scene_fields
+from shared.story import asset_names, episode_url, generate_shots, pick_episode, references_markdown, scene_fields
 from shared.worlds import model_select, render_world_switcher
 
 
@@ -127,21 +127,6 @@ def collect(edited: Dict, prefix: str) -> Dict:
     return {**edited, 'shots': shots}
 
 
-def generate(world: str, episode: str, shots: List[Tuple[str, str]]) -> None:
-    """Render each ``(scene, shot)`` reference frame in turn, then rerun to show them."""
-    warnings = []
-    with st.status(f"Generating {len(shots)} frame(s)... each can take a few minutes.") as status:
-        for scene_id, shot_id in shots:
-            status.write(f"Rendering `{scene_id}` · `{shot_id}`...")
-            try:
-                api.post(f"{episode_url(world, episode)}/scenes/{scene_id}/shots/{shot_id}/generate")
-            except api.ApiError as exc:
-                warnings.append(f"{scene_id}/{shot_id}: {exc}")
-    if warnings:
-        notify('warning', "Some renders failed: " + "; ".join(warnings))
-    notify('success', f"Generated {len(shots)} frame(s).")
-
-
 def render_new_scene(count: int) -> Tuple[str, bool]:
     name_col, button_col = st.columns([3, 1])
     name = name_col.text_input("New scene", placeholder=f"scene{count + 1}", label_visibility='collapsed')
@@ -210,7 +195,7 @@ def main() -> None:
         st.error(str(exc))
         return
     if to_generate:
-        generate(world, episode, to_generate)
+        generate_shots(world, episode, to_generate, "frame")
     notify('success', "Script saved.")
 
 

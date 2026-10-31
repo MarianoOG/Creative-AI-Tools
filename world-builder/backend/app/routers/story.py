@@ -188,7 +188,6 @@ def generate_shot(world: str, episode: str, scene: str, shot: str, body: Optiona
         )
     except Exception as exc:  # any provider failure: the client gets the reason
         raise HTTPException(502, f"{provider}: {exc}") from exc
-    if body.final and provider != script["final_provider"]:
-        story.save_script(world, episode, {**story.read_script(world, episode), "final_provider": provider})
     field = "final" if body.final else "image"
-    return story.with_images(world, episode, story.set_shot_image(world, episode, scene, shot, path, field))
+    final_provider = provider if body.final else None
+    return story.with_images(world, episode, story.set_shot_image(world, episode, scene, shot, path, field, final_provider))

@@ -36,12 +36,13 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from app.assets.generation import ASPECT_RATIOS, DEFAULT_FINAL_PROVIDER, DEFAULT_SHOT_PROVIDER, FINAL_PROVIDERS, PROVIDERS
 from app.assets.prompt_manager import ASSET_DIRS
-from app.assets.worlds import images_in, legacy_name, move_to_deleted, slugify, subfolders, world_dir
+from app.assets.worlds import images_in, legacy_name, move_to_deleted, slugify, subfolders, world_dir, write_json
 from app.settings import relative
 
 SCRIPT_FILE = "script.json"
@@ -55,6 +56,10 @@ SHOT_TYPES = [
 ]
 
 Script = Dict[str, Any]
+
+#: Held across each read-change-save of a ``script.json``, so shots rendered in
+#: parallel never drop each other's frame. A thread lock: the backend runs one process.
+_lock = threading.RLock()
 
 
 def _natural(name: str) -> list:
@@ -148,6 +153,11 @@ def read_script(world: str, episode: str) -> Script:
 
 def save_script(world: str, episode: str, raw: Dict) -> Script:
     """Save a script. A shot or setting the client left out keeps what is on disk, so a page that only edits text never drops an image."""
+    with _lock:
+        return _save_script(world, episode, raw)
+
+
+def _save_script(world: str, episode: str, raw: Dict) -> Script:
     current = read_script(world, episode)
     frames = {
         (scene["id"], shot["id"]): {"image": shot["image"], "final": shot["final"]}
@@ -165,7 +175,7 @@ def save_script(world: str, episode: str, raw: Dict) -> Script:
         ],
     }
     script = _normalise(world, episode, raw)
-    (episode_dir(world, episode) / SCRIPT_FILE).write_text(json.dumps(script, indent=2, ensure_ascii=False) + "\n")
+    write_json(episode_dir(world, episode) / SCRIPT_FILE, script)
     return script
 
 
@@ -180,14 +190,21 @@ def with_images(world: str, episode: str, script: Script) -> Script:
     return script
 
 
-def set_shot_image(world: str, episode: str, scene: str, shot: str, image: Path, field: str = "image") -> Script:
-    """Point a shot's ``image`` (or ``final``) at a new file. The previous file stays in the scene folder."""
-    script = read_script(world, episode)
-    for scene_data in script["scenes"]:
-        for shot_data in scene_data["shots"]:
-            if scene_data["id"] == scene and shot_data["id"] == shot:
-                shot_data[field] = image.name
-    return save_script(world, episode, script)
+def set_shot_image(world: str, episode: str, scene: str, shot: str, image: Path, field: str = "image",
+                   final_provider: Optional[str] = None) -> Script:
+    """Point a shot's ``image`` (or ``final``) at a new file, and set the episode's ``final_provider`` if given.
+
+    The previous file stays in the scene folder.
+    """
+    with _lock:
+        script = read_script(world, episode)
+        for scene_data in script["scenes"]:
+            for shot_data in scene_data["shots"]:
+                if scene_data["id"] == scene and shot_data["id"] == shot:
+                    shot_data[field] = image.name
+        if final_provider:
+            script["final_provider"] = final_provider
+        return save_script(world, episode, script)
 
 
 def _new_dir(parent: Path, name: str, what: str) -> Path:
