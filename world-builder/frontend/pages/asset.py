@@ -26,7 +26,7 @@ def take_link() -> None:
     if params.get('name') and params.get('type'):
         if params.get('world') and params['world'] != st.session_state.current_world:
             st.session_state.current_world = params['world']
-            st.session_state.current_episode = st.session_state.current_scene = None
+            st.session_state.current_episode = None
         st.session_state.current_asset = (params['type'], params['name'])
         st.query_params.clear()
 

@@ -15,6 +15,9 @@ the storyboard frame plans, saved in the same scene folder as
 ``{uuid8}-{shot}-final``. ``final_provider`` is the model the last high-fidelity
 pass of the episode used (OpenAI or Gemini).
 
+A shot's ``type`` is its framing, one of ``SHOT_TYPES`` (or ``null`` when not
+picked); it leads the shot's description in both renders.
+
 script.json::
 
     {
@@ -22,7 +25,7 @@ script.json::
       "scenes": [{
         "id": "scene1", "heading": "INT. KITCHEN - DAY", "summary": "...",
         "characters": ["fox", "fox:older"], "locations": ["kitchen"], "objects": ["lantern"],
-        "shots": [{"id": "shot_1", "action": "...", "image": "1a2b3c4d-shot_1.png", "final": "5e6f7a8b-shot_1-final.jpg"}]
+        "shots": [{"id": "shot_1", "type": "Wide shot", "action": "...", "image": "1a2b3c4d-shot_1.png", "final": "5e6f7a8b-shot_1-final.jpg"}]
       }]
     }
 
@@ -42,6 +45,14 @@ from app.assets.worlds import images_in, legacy_name, move_to_deleted, slugify, 
 from app.settings import relative
 
 SCRIPT_FILE = "script.json"
+
+#: The framings a shot can have, from the widest to the tightest.
+SHOT_TYPES = [
+    "Establishing shot", "Panorama", "Extreme wide shot", "Wide shot", "Full shot", "Medium wide shot",
+    "Medium shot", "Medium close-up", "Close-up", "Extreme close-up", "Detail shot",
+    "Over-the-shoulder shot", "Two shot", "Point-of-view shot", "Low angle shot", "High angle shot",
+    "Aerial shot",
+]
 
 Script = Dict[str, Any]
 
@@ -84,6 +95,7 @@ def _clean_shot(raw: Dict, folder: Path) -> Dict:
     image = raw["image"] if "image" in raw else _legacy_frame(folder, shot_id)
     return {
         "id": shot_id,
+        "type": raw.get("type") if raw.get("type") in SHOT_TYPES else None,
         "action": str(raw.get("action", "")),
         "image": Path(str(image)).name if image else None,
         "final": Path(str(raw["final"])).name if raw.get("final") else None,
@@ -235,7 +247,8 @@ def rename_references(world: str, folder: str, old: str, new: str) -> None:
 
 def shot_description(scene: Dict, shot: Dict, cast: List[str]) -> str:
     """What a shot's frame should show, with ``cast`` (one line per character, location or object)."""
-    lines = [scene["heading"], scene["summary"], shot["action"]]
+    action = f"{shot['type']}: {shot['action']}" if shot["type"] else shot["action"]
+    lines = [scene["heading"], scene["summary"], action]
     if cast:
         lines.append("In this scene:\n" + "\n".join(f"- {line}" for line in cast))
     return "\n".join(line for line in lines if line.strip())

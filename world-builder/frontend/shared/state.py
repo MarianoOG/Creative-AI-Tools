@@ -9,9 +9,8 @@ def init_session_state() -> None:
     defaults = {
         # The world every page shows, and the one new assets are written into.
         'current_world': None,
-        # The episode and scene the Episode and Storyboard pages open on.
+        # The episode the Script and Storyboard pages open on.
         'current_episode': None,
-        'current_scene': None,
         # The (asset_type, name) the Asset page opens on.
         'current_asset': None,
         # One-shot (kind, text) message shown after the rerun that caused it.

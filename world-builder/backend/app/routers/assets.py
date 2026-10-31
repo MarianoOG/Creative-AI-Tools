@@ -174,6 +174,7 @@ def options() -> Dict:
         "final_providers": list(FINAL_PROVIDERS),
         "default_final_provider": DEFAULT_FINAL_PROVIDER,
         "aspect_ratios": list(ASPECT_RATIOS),
+        "shot_types": story.SHOT_TYPES,
         "location_views": list(LOCATION_VIEWS),
         "default_world": DEFAULT_WORLD,
     }

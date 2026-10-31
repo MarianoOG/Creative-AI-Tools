@@ -1,4 +1,4 @@
-"""Helpers shared by the Episode and Storyboard pages: pickers and the scene editor."""
+"""Helpers shared by the Script and Storyboard pages: pickers and the scene editor."""
 
 from __future__ import annotations
 
@@ -32,13 +32,7 @@ def pick_episode(world: str) -> Optional[str]:
     )
     if chosen != st.session_state.current_episode:
         st.session_state.current_episode = chosen
-        st.session_state.current_scene = None
     return chosen
-
-
-def open_storyboard(scene: str) -> None:
-    st.session_state.current_scene = scene
-    st.switch_page("pages/storyboard.py")
 
 
 def asset_names(world: str) -> Dict[str, List[str]]:

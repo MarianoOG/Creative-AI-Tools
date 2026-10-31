@@ -147,7 +147,7 @@ def generate_shot(world: str, episode: str, scene: str, shot: str, body: Optiona
         raise HTTPException(404, f"no scene called {scene!r}")
     shot_data = next((s for s in scene_data["shots"] if s["id"] == shot), None)
     if shot_data is None:
-        raise HTTPException(404, f"no shot called {shot!r} - save the storyboard first")
+        raise HTTPException(404, f"no shot called {shot!r} - save the script first")
 
     world_data = read_world(world)
     cast = []

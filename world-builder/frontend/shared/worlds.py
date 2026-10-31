@@ -48,7 +48,7 @@ def render_world_switcher() -> Tuple[str, Dict]:
     if chosen != current:
         state = st.session_state
         state.current_world = chosen
-        state.current_episode = state.current_scene = None
+        state.current_episode = None
         st.rerun()
 
     with st.sidebar:

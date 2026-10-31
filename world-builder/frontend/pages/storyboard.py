@@ -1,96 +1,89 @@
-"""Storyboard: one scene's shots, each with its one frame and its text, and generation of the missing frames.
+"""Storyboard: an episode's high-fidelity final frames in a grid, their generation, and a zip of them all.
 
-Frames use the episode's model and aspect ratio (set on the Episode page), at
-low quality, as a low detailed view in the world's style, drawn from text alone
-(no reference images). Regenerating replaces a shot's frame; the old file stays on disk.
-
-Every change (save, add, delete) first collects what is typed in the widgets,
-so no unsaved edit is lost.
+The Script page's reference frames stay the quick, low detailed draft. A final
+frame is the finished image of a shot, rendered once by OpenAI or Gemini at high
+quality from the reference frame and the designs of everything the scene lists. Any one can
+be regenerated; the old file stays on disk.
 """
 
 from __future__ import annotations
 
-import re
-from typing import Dict, List, Optional
+import io
+import zipfile
+from pathlib import Path
+from typing import Dict, List, Tuple
 
 import streamlit as st
 
 import api
 from shared.state import notify, show_notice
-from shared.story import asset_names, episode_url, pick_episode, scene_fields
+from shared.story import episode_url, pick_episode
 from shared.worlds import render_world_switcher
 
-
-def pick_scene(script: Dict) -> Optional[Dict]:
-    scenes = [scene['id'] for scene in script['scenes']]
-    if not scenes:
-        st.info("This episode has no scenes yet. Add one from the Episode page.")
-        return None
-    headings = {scene['id']: scene['heading'] for scene in script['scenes']}
-    current = st.session_state.current_scene if st.session_state.current_scene in scenes else scenes[0]
-    chosen = st.selectbox(
-        "Scene", scenes, index=scenes.index(current), format_func=lambda s: f"{s} · {headings[s]}".rstrip(" ·")
-    )
-    st.session_state.current_scene = chosen
-    return next(scene for scene in script['scenes'] if scene['id'] == chosen)
+COLUMNS = 3
 
 
-def shot_key(prefix: str, shot: Dict, field: str) -> str:
-    return f"{prefix}{shot['id']}_{field}"
+def shots_in_order(script: Dict) -> List[Tuple[Dict, Dict]]:
+    return [(scene, shot) for scene in script['scenes'] for shot in scene['shots']]
 
 
-def collect(edited: Dict, prefix: str) -> Dict:
-    """The scene as currently typed: ``edited`` scene fields plus every shot's action."""
-    state = st.session_state
-    shots = [{'id': shot['id'], 'action': state[shot_key(prefix, shot, 'action')]} for shot in edited['shots']]
-    return {**edited, 'shots': shots}
+@st.cache_data(show_spinner=False, max_entries=4)
+def build_zip(files: Tuple[Tuple[str, str], ...]) -> bytes:
+    """A zip of ``(name in the zip, data-relative path)`` pairs. Cached on the paths, which change with every render."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_STORED) as archive:  # images are already compressed
+        for name, path in files:
+            archive.write(api.file_path(path), name)
+    return buffer.getvalue()
 
 
-def save(world: str, episode: str, script: Dict, scene: Dict) -> Dict:
-    scenes = [scene if s['id'] == scene['id'] else s for s in script['scenes']]
-    return api.put(episode_url(world, episode), json={**script, 'scenes': scenes})
+def export_files(script: Dict) -> Tuple[Tuple[str, str], ...]:
+    """Every final frame, named in story order (``01_scene1_01_shot_1.png``) so the files sort as the episode runs."""
+    files = []
+    for scene_number, scene in enumerate(script['scenes'], start=1):
+        for shot_number, shot in enumerate(scene['shots'], start=1):
+            if shot.get('final_path'):
+                suffix = Path(shot['final_path']).suffix
+                files.append((f"{scene_number:02}_{scene['id']}_{shot_number:02}_{shot['id']}{suffix}", shot['final_path']))
+    return tuple(files)
 
 
-def next_shot_id(shots: List[Dict]) -> str:
-    """A fresh ``shot_N``."""
-    taken = [shot['id'] for shot in shots]
-    numbers = [int(m.group(1)) for name in taken if (m := re.fullmatch(r"shot_(\d+)", name))]
-    return f"shot_{max(numbers, default=len(shots)) + 1}"
-
-
-def generate(world: str, episode: str, scene_id: str, shot_ids: List[str]) -> None:
-    """Render each shot in turn, then rerun to show the new frames."""
+def generate(world: str, episode: str, shots: List[Tuple[str, str]], provider: str) -> None:
+    """Render each ``(scene, shot)`` final frame in turn, then rerun to show them."""
     warnings = []
-    with st.status(f"Generating {len(shot_ids)} frame(s)... each can take a few minutes.") as status:
-        for shot_id in shot_ids:
-            status.write(f"Rendering `{shot_id}`...")
+    with st.status(f"Generating {len(shots)} high-fidelity frame(s)... each can take a few minutes.") as status:
+        for scene_id, shot_id in shots:
+            status.write(f"Rendering `{scene_id}` · `{shot_id}`...")
             try:
-                api.post(f"{episode_url(world, episode)}/scenes/{scene_id}/shots/{shot_id}/generate")
+                api.post(
+                    f"{episode_url(world, episode)}/scenes/{scene_id}/shots/{shot_id}/generate",
+                    json={'final': True, 'provider': provider},
+                )
             except api.ApiError as exc:
-                warnings.append(f"{shot_id}: {exc}")
+                warnings.append(f"{scene_id}/{shot_id}: {exc}")
     if warnings:
         notify('warning', "Some renders failed: " + "; ".join(warnings))
-    notify('success', f"Generated {len(shot_ids)} frame(s).")
+    notify('success', f"Generated {len(shots)} high-fidelity frame(s).")
 
 
-def render_shot(shot: Dict, prefix: str, number: int) -> Dict[str, bool]:
-    """One storyboard row: the frame on the left, the text on the right."""
-    image_col, text_col = st.columns([3, 2])
-    with image_col:
-        if shot.get('path'):
-            st.image(str(api.file_path(shot['path'])), width='stretch')
-        else:
-            st.info("No frame yet.")
-    with text_col:
-        st.markdown(f"**{number}.** `{shot['id']}`")
-        st.text_area("Action", value=shot['action'], height=200, key=shot_key(prefix, shot, 'action'))
-        generate_col, delete_col = st.columns(2)
-        return {
-            'generate': generate_col.button(
-                "Regenerate" if shot.get('path') else "Generate", key=shot_key(prefix, shot, 'generate'), width='stretch'
-            ),
-            'delete': delete_col.button("Remove", key=shot_key(prefix, shot, 'remove'), width='stretch'),
-        }
+def render_grid(script: Dict) -> List[Tuple[str, str]]:
+    """Every shot's final frame, scene by scene, with a Regenerate button below each. Returns the ones clicked."""
+    clicked = []
+    for scene in script['scenes']:
+        if not scene['shots']:
+            continue
+        st.subheader(scene['heading'] or scene['id'])
+        for start in range(0, len(scene['shots']), COLUMNS):
+            for column, shot in zip(st.columns(COLUMNS), scene['shots'][start:start + COLUMNS]):
+                with column:
+                    if shot.get('final_path'):
+                        st.image(str(api.file_path(shot['final_path'])), width='stretch')
+                    else:
+                        st.info(f"`{shot['id']}`: no high-fidelity frame yet.")
+                    label = "Regenerate" if shot.get('final_path') else "Generate"
+                    if st.button(label, key=f"final_{scene['id']}_{shot['id']}", width='stretch'):
+                        clicked.append((scene['id'], shot['id']))
+    return clicked
 
 
 def main() -> None:
@@ -100,48 +93,40 @@ def main() -> None:
     if not episode:
         return
     script = api.get(episode_url(world, episode))
-    scene = pick_scene(script)
-    if not scene:
-        return
     show_notice()
-    if st.button("Back to the script", icon=":material/arrow_back:"):
-        st.switch_page("pages/episode.py")
+    shots = shots_in_order(script)
+    if not shots:
+        st.info("This episode has no shots yet. Write them on the Script page.")
+        return
 
-    names = asset_names(world)
-    prefix = f"sb_{world}_{episode}_{scene['id']}_"
-    edited = scene_fields(scene, names, prefix)
-
-    provider = api.options()['providers'][script['provider']]
-    settings_col, save_col, missing_col = st.columns([2, 1, 1])
-    settings_col.caption(f"Frames: {provider} · {script['aspect_ratio']} · low detailed view. Change them on the Episode page.")
-    missing = [shot['id'] for shot in scene['shots'] if not shot.get('path')]
-    save_clicked = save_col.button("Save storyboard", type="primary", width='stretch')
-    missing_clicked = missing_col.button(
-        f"Generate {len(missing)} missing frame(s)", disabled=not missing, width='stretch'
+    options = api.options()
+    providers = options['final_providers']
+    model_col, action_col = st.columns([2, 1], vertical_alignment='bottom')
+    provider = model_col.selectbox(
+        "Model", providers, index=providers.index(script['final_provider']),
+        format_func=options['providers'].get, key=f"final_provider_{world}_{episode}",
     )
+    missing = [(scene['id'], shot['id']) for scene, shot in shots if not shot.get('final_path')]
+    generate_all = False
+    with action_col:
+        if missing:
+            generate_all = st.button(
+                f"Generate {len(missing)} high-fidelity frame(s)", type="primary", width='stretch'
+            )
+        else:
+            st.download_button(
+                "Export all frames", data=build_zip(export_files(script)), file_name=f"{world}_{episode}.zip",
+                mime="application/zip", type="primary", icon=":material/download:", width='stretch',
+            )
+    no_storyboard = sum(1 for _, shot in shots if not shot.get('path'))
+    if no_storyboard:
+        st.caption(f"{no_storyboard} shot(s) have no reference frame, so theirs are drawn from text and the scene's designs alone.")
 
-    actions = {}
-    for number, shot in enumerate(scene['shots'], start=1):
-        st.divider()
-        actions[shot['id']] = render_shot(shot, prefix, number)
     st.divider()
-    add_clicked = st.button("Add shot", icon=":material/add:")
-
-    # Act once every widget is drawn, so ``collect`` sees all of them.
-    edited = collect(edited, prefix)
-    to_generate = missing if missing_clicked else [i for i, a in actions.items() if a['generate']]
-    removed = [i for i, a in actions.items() if a['delete']]
-    if add_clicked:
-        edited['shots'].append({'id': next_shot_id(edited['shots']), 'action': ""})
-    if removed:
-        edited['shots'] = [shot for shot in edited['shots'] if shot['id'] not in removed]
-        for key in [k for k in st.session_state if any(k.startswith(f"{prefix}{i}_") for i in removed)]:
-            del st.session_state[key]
-    if save_clicked or add_clicked or removed or to_generate:
-        save(world, episode, script, edited)
-        if to_generate:
-            generate(world, episode, scene['id'], to_generate)
-        notify('success', "Storyboard saved.")
+    clicked = render_grid(script)
+    to_generate = missing if generate_all else clicked
+    if to_generate:
+        generate(world, episode, to_generate, provider)
 
 
 main()

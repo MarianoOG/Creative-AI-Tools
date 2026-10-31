@@ -22,9 +22,8 @@ works is in `backend/app/assets/README.md`.
 | --- | --- |
 | World | The world's characters, locations and objects (three columns, each shown by its preferred image) and episodes, one tab each. Create assets (a name and a description) and episodes here. Click an image or Edit to open the asset. |
 | Asset | One asset: edit its name and description, and generate, prefer, regenerate (one or all) and delete its variations, or a location's views. |
-| Episode script | The whole episode as text, scene by scene, with each scene's references. Add, edit and delete scenes, and set the episode's model and aspect ratio. |
-| Storyboard | One scene's shots: each frame next to its action, generation of the missing frames, and regeneration. |
-| Export | An episode's high-fidelity final frames in a grid, each with a Regenerate button. Generate the missing ones in one click (OpenAI or Gemini, your pick), then download them all as a zip. |
+| Script | The whole episode, scene by scene and shot by shot, editable in place: each scene's heading, summary and references, and each shot's type (wide, medium, close-up, panorama, ...) and action, with its small low detailed reference frame on the side. Add and delete scenes and shots, generate or regenerate frames, and set the episode's model and aspect ratio. Any button saves everything typed on the page. |
+| Storyboard | An episode's high-fidelity final frames in a grid, each with a Regenerate button. Generate the missing ones in one click (OpenAI or Gemini, your pick), then download them all as a zip. |
 | Manage worlds | Create (from a style preset), rename and delete worlds. |
 
 The sidebar holds the world picker and the world's style, editable in place.

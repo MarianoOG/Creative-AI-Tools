@@ -56,9 +56,8 @@ pages = {
         st.Page("pages/asset.py", title="Asset", icon=":material/add_photo_alternate:"),
     ],
     "Story": [
-        st.Page("pages/episode.py", title="Episode script", icon=":material/description:"),
+        st.Page("pages/script.py", title="Script", icon=":material/description:"),
         st.Page("pages/storyboard.py", title="Storyboard", icon=":material/movie:"),
-        st.Page("pages/export.py", title="Export", icon=":material/download:"),
     ],
     "Settings": [
         st.Page("pages/worlds.py", title="Manage worlds", icon=":material/settings:"),

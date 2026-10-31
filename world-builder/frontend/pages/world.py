@@ -124,8 +124,7 @@ def render_episodes(world: str) -> None:
             info_col.write(episode['synopsis'])
         if open_col.button("Open script", key=f"open_{episode['name']}", width='stretch'):
             st.session_state.current_episode = episode['name']
-            st.session_state.current_scene = None
-            st.switch_page("pages/episode.py")
+            st.switch_page("pages/script.py")
         with open_col.popover("Delete", width='stretch'):
             st.warning(
                 f"All {episode['scene_count']} scenes and every shot image in **{episode['name']}** "
