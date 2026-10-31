@@ -23,9 +23,9 @@ works is in `backend/app/assets/README.md`.
 | Asset | One asset: edit its name and description, and generate, prefer, regenerate (one or all) and delete its variations, or a location's views. |
 | Script | The whole episode, scene by scene and shot by shot, editable in place: each scene's heading, summary and references, and each shot's type (wide, medium, close-up, panorama, ...) and action, as text only (nothing is generated here). Add and delete scenes and shots, and set the episode's aspect ratio. Any button saves everything typed on the page. |
 | Storyboard | An episode's high-fidelity final frames in a grid, each with a Regenerate button. Generate the missing ones in one click (OpenAI or Gemini, your pick, drawn from the shot's text and the scene's designs in the world's style), then download them all as a zip. Once all exist, the small refresh icon beside Export regenerates every one (after a confirm). |
-| Manage worlds | Create (from a style preset), rename and delete worlds. |
+| Manage worlds | Create (from a style preset) and delete worlds, and edit each one's name and style behind one Save world button. |
 
-The sidebar holds the world picker and the world's style, editable in place.
+The sidebar holds the world picker.
 Nothing in the app removes a file. Deleting an asset or a variation only drops
 it from `world.json`; deleting a world, an episode or a scene moves its folder
 into a hidden `.deleted/` folder next to it. Each asks first.
