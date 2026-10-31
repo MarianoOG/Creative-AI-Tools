@@ -31,21 +31,18 @@ PROVIDERS = {
     "runware": "Runware Flux 2 Klein 4B",
 }
 DEFAULT_PROVIDER = "openai"
-#: The models a high-fidelity final frame can use, and the default one.
-FINAL_PROVIDERS = ("openai", "gemini", "runware")
+#: The models a final frame can use (all of them), and the default one.
+FINAL_PROVIDERS = tuple(PROVIDERS)
 DEFAULT_FINAL_PROVIDER = "gemini"
 
 #: Friendly name -> the ratio Gemini takes.
 ASPECT_RATIOS = {"landscape": "16:9", "square": "1:1", "portrait": "9:16"}
 
-#: Ratio -> the 2K pixel size gpt-image-2 takes (both sides divisible by 16).
-OPENAI_SIZES = {"16:9": "2048x1152", "1:1": "2048x2048", "9:16": "1152x2048"}
+#: Ratio -> the 2K (width, height) OpenAI and Runware render (both sides divisible by 16).
+SIZES = {"16:9": (2048, 1152), "1:1": (2048, 2048), "9:16": (1152, 2048)}
 
 #: Provider -> the most reference images it takes (the API limits).
 MAX_REFERENCES = {"runware": 4, "openai": 16, "gemini": 14}
-
-#: Ratio -> the 2K (width, height) Runware renders, the same as gpt-image-2's.
-RUNWARE_SIZES = {"16:9": (2048, 1152), "1:1": (2048, 2048), "9:16": (1152, 2048)}
 
 #: Quality -> (OpenAI ``quality``, Gemini ``thinking_level``). The Gemini model
 #: rejects every thinking level but "high", so below that nothing is sent.
@@ -69,6 +66,14 @@ def _api_key(name: str) -> str:
     if not key:
         raise RuntimeError(f"{name} is not set (see backend/.env)")
     return key
+
+
+def _mime_type(path: Path) -> str:
+    return mimetypes.guess_type(path.name)[0] or "image/png"
+
+
+def _base64(path: Path) -> str:
+    return base64.b64encode(path.read_bytes()).decode()
 
 
 def _openai_bytes(prompt: str, size: str, quality: str, references: list[Path]) -> bytes:
@@ -100,8 +105,8 @@ def _gemini_bytes(prompt: str, ratio: str, image_size: str, thinking_level: Opti
         model_input = [{"type": "text", "text": prompt}] + [
             {
                 "type": "image",
-                "data": base64.b64encode(path.read_bytes()).decode(),
-                "mime_type": mimetypes.guess_type(path.name)[0] or "image/png",
+                "data": _base64(path),
+                "mime_type": _mime_type(path),
             }
             for path in references
         ]
@@ -145,10 +150,7 @@ def _runware_bytes(prompt: str, size: tuple[int, int], references: list[Path]) -
         "includeCost": False,
     }
     if references:
-        task["inputs"] = {"referenceImages": [
-            f"data:{mimetypes.guess_type(path.name)[0] or 'image/png'};base64,{base64.b64encode(path.read_bytes()).decode()}"
-            for path in references
-        ]}
+        task["inputs"] = {"referenceImages": [f"data:{_mime_type(path)};base64,{_base64(path)}" for path in references]}
 
     response = httpx.post(
         RUNWARE_URL, json=[task], headers={"Authorization": f"Bearer {_api_key('RUNWARE_API_KEY')}"}, timeout=180
@@ -188,9 +190,10 @@ def generate_image(
     ratio = ASPECT_RATIOS[aspect_ratio]
     openai_quality, thinking_level = QUALITY[quality]
     if provider == "openai":
-        data = _openai_bytes(prompt, OPENAI_SIZES[ratio], openai_quality, references)
+        width, height = SIZES[ratio]
+        data = _openai_bytes(prompt, f"{width}x{height}", openai_quality, references)
     elif provider == "runware":
-        data = _runware_bytes(prompt, RUNWARE_SIZES[ratio], references)
+        data = _runware_bytes(prompt, SIZES[ratio], references)
     else:
         data = _gemini_bytes(prompt, ratio, "2K", thinking_level, references)
     image_format = Image.open(BytesIO(data)).format

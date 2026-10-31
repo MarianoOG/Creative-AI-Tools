@@ -20,9 +20,9 @@ works is in `backend/app/assets/README.md`.
 | Page | What it shows |
 | --- | --- |
 | World | The world's characters, locations and objects (three columns, each shown by its preferred image) and episodes, one tab each. Create assets (a name and a description) and episodes (a title, a synopsis and an aspect ratio) the same way, from a New button that opens a small form; a new one opens on its own page. Click an image or Edit to open the asset. |
-| Asset | One asset: edit its name and description, and generate, prefer, regenerate (one or all) and delete its variations, or a location's views. |
-| Script | The whole episode, scene by scene and shot by shot, editable in place: each scene's heading, summary and references, and each shot's type (wide, medium, close-up, panorama, ...) and action, as text only (nothing is generated here). Add and delete scenes and shots, and set the episode's aspect ratio. Any button saves everything typed on the page. |
-| Storyboard | An episode's high-fidelity final frames in a grid, each with a Regenerate button. Generate the missing ones in one click (OpenAI, Gemini or Runware Flux 2 Klein, your pick, drawn from the shot's text and the scene's designs in the world's style), then download them all as a zip. Once all exist, the small refresh icon beside Export regenerates every one (after a confirm). |
+| Asset | One asset, picked in the sidebar: edit its name and description, and generate, prefer, regenerate (one or all) and delete its variations, or a location's views. |
+| Script | The whole episode, scene by scene and shot by shot, editable in place: each scene's heading, summary and references, and each shot's type (wide, medium, close-up, panorama, ...) and action, as text only (nothing is generated here). Add and delete scenes and shots (shots are numbered `shot1`, `shot2`... by their place in the scene, never named), and set the episode's aspect ratio. The episode picker and Save script are in the sidebar. Any button saves everything typed on the page. |
+| Storyboard | An episode's final frames in a grid, each with a Regenerate button. Generate the missing ones in one click (OpenAI, Gemini or Runware Flux 2 Klein, your pick, drawn from the shot's text and the scene's designs in the world's style), then download them all as a zip. Once all exist, the small refresh icon beside Export regenerates every one (after a confirm). |
 | Manage worlds | Create (from a style preset) and delete worlds, and edit each one's name and style behind one Save world button. |
 
 The sidebar holds the world picker.

@@ -1,4 +1,4 @@
-"""Storyboard: an episode's high-fidelity final frames in a grid, their generation, and a zip of them all.
+"""Storyboard: an episode's final frames in a grid, their generation, and a zip of them all.
 
 A final frame is the finished image of a shot, rendered once by OpenAI, Gemini or Runware (Flux 2 Klein) at high quality from
 the shot's text and the designs of everything the scene lists, in the world's
@@ -18,9 +18,8 @@ import streamlit as st
 import api
 from shared.state import show_notice
 from shared.story import episode_url, generate_shots, pick_episode
+from shared.ui import grid
 from shared.worlds import render_world_switcher
-
-COLUMNS = 3
 
 
 def shots_in_order(script: Dict) -> List[Tuple[Dict, Dict]]:
@@ -55,16 +54,15 @@ def render_grid(script: Dict) -> List[Tuple[str, str]]:
         if not scene['shots']:
             continue
         st.subheader(scene['heading'] or scene['id'])
-        for start in range(0, len(scene['shots']), COLUMNS):
-            for column, shot in zip(st.columns(COLUMNS), scene['shots'][start:start + COLUMNS]):
-                with column:
-                    if shot.get('final_path'):
-                        st.image(str(api.file_path(shot['final_path'])), width='stretch')
-                    else:
-                        st.info(f"`{shot['id']}`: no high-fidelity frame yet.")
-                    label = "Regenerate" if shot.get('final_path') else "Generate"
-                    if st.button(label, key=f"final_{scene['id']}_{shot['id']}", width='stretch'):
-                        clicked.append((scene['id'], shot['id']))
+        for column, shot in grid(scene['shots']):
+            with column:
+                if shot.get('final_path'):
+                    st.image(str(api.file_path(shot['final_path'])), width='stretch')
+                else:
+                    st.info(f"`{shot['id']}`: no frame yet.")
+                label = "Regenerate" if shot.get('final_path') else "Generate"
+                if st.button(label, key=f"final_{scene['id']}_{shot['id']}", width='stretch'):
+                    clicked.append((scene['id'], shot['id']))
     return clicked
 
 
@@ -93,13 +91,13 @@ def main() -> None:
     with action_col:
         if missing:
             generate_all = st.button(
-                f"Generate {len(missing)} high-fidelity frame(s)", type="primary", width='stretch'
+                f"Generate {len(missing)} frame(s)", type="primary", width='stretch'
             )
         else:
             # Regenerate all stays one small icon beside Export; it asks first, as every frame is a paid render.
             refresh_col, export_col = st.columns([1, 4], vertical_alignment='bottom')
             with refresh_col.popover("", icon=":material/refresh:", help="Regenerate all frames", width='stretch'):
-                st.write(f"Render all {len(shots)} high-fidelity frames again? The current files stay on disk.")
+                st.write(f"Render all {len(shots)} frames again? The current files stay on disk.")
                 regenerate_all = st.button("Regenerate all", icon=":material/refresh:", type="primary")
             export_col.download_button(
                 "Export all frames", data=build_zip(export_files(script)), file_name=f"{world}_{episode}.zip",
@@ -113,7 +111,7 @@ def main() -> None:
     else:
         to_generate = missing if generate_all else clicked
     if to_generate:
-        generate_shots(world, episode, to_generate, "high-fidelity frame", {'provider': provider})
+        generate_shots(world, episode, to_generate, "frame", {'provider': provider})
 
 
 main()

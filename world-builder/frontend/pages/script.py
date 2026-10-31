@@ -10,7 +10,6 @@ anywhere on the page and saves the whole episode, so no unsaved edit is lost.
 from __future__ import annotations
 
 import math
-import re
 from typing import Dict, List, Tuple
 
 import streamlit as st
@@ -18,6 +17,7 @@ import streamlit as st
 import api
 from shared.state import notify, show_notice
 from shared.story import asset_names, episode_url, pick_episode, scene_fields
+from shared.ui import show_errors
 from shared.worlds import render_world_switcher
 
 
@@ -42,17 +42,10 @@ def action_height(text: str) -> int:
     return min(400, max(68, 24 * lines + 20))
 
 
-def next_shot_id(shots: List[Dict]) -> str:
-    """A fresh ``shot_N``."""
-    taken = [shot['id'] for shot in shots]
-    numbers = [int(m.group(1)) for name in taken if (m := re.fullmatch(r"shot_(\d+)", name))]
-    return f"shot_{max(numbers, default=len(shots)) + 1}"
-
-
-def render_shot(shot: Dict, prefix: str, number: int, shot_types: List[str]) -> Dict[str, bool]:
-    """One shot: its type and action, with a remove button."""
+def render_shot(shot: Dict, prefix: str, shot_types: List[str]) -> Dict[str, bool]:
+    """One shot: its number, type and action, with a remove button."""
     id_col, type_col, remove_col = st.columns([1, 3, 0.4], vertical_alignment='center')
-    id_col.markdown(f"**{number}.** `{shot['id']}`")
+    id_col.markdown(f"**{shot['id']}**")
     type_col.selectbox(
         "Shot type", shot_types, index=shot_types.index(shot['type']) if shot['type'] in shot_types else None,
         placeholder="Shot type", label_visibility='collapsed', key=shot_key(prefix, shot, 'type'),
@@ -78,8 +71,7 @@ def render_scene(scene: Dict, number: int, prefix: str, names: Dict, shot_types:
 
     st.markdown("**Shots**")
     shots = {
-        shot['id']: render_shot(shot, prefix, shot_number, shot_types)
-        for shot_number, shot in enumerate(scene['shots'], start=1)
+        shot['id']: render_shot(shot, prefix, shot_types) for shot in scene['shots']
     }
     add_clicked = st.button("Add shot", icon=":material/add:", key=f"{prefix}add")
     return edited, {'shots': shots, 'add': add_clicked, 'delete': delete_clicked}
@@ -104,14 +96,13 @@ def render_new_scene(count: int) -> Tuple[str, bool]:
 
 def main() -> None:
     world, _ = render_world_switcher()
-    episode = pick_episode(world)
+    episode = pick_episode(world, st.sidebar)
     if not episode:
         return
     script = api.get(episode_url(world, episode))
     options = api.options()
+    save_clicked = st.sidebar.button("Save script", type="primary", width='stretch')
     show_notice()
-    _, save_col = st.columns([3, 1])
-    save_clicked = save_col.button("Save script", type="primary", width='stretch')
     header = render_header(episode, script, options['aspect_ratios'])
 
     names = asset_names(world)
@@ -119,7 +110,7 @@ def main() -> None:
     scenes = []
     for number, scene in enumerate(script['scenes'], start=1):
         st.divider()
-        prefix = f"sc_{world}_{episode}_{scene['id']}_"
+        prefix = f"sc_{world}_{episode}_{st.session_state.script_revision}_{scene['id']}_"
         edited, actions = render_scene(scene, number, prefix, names, shot_types)
         scenes.append((scene['id'], prefix, edited, actions))
     st.divider()
@@ -134,10 +125,9 @@ def main() -> None:
         removed = [shot_id for shot_id, clicked in actions['shots'].items() if clicked['remove']]
         if removed:
             edited['shots'] = [shot for shot in edited['shots'] if shot['id'] not in removed]
-            for key in [k for k in st.session_state if any(k.startswith(f"{prefix}{i}_") for i in removed)]:
-                del st.session_state[key]
         if actions['add']:
-            edited['shots'].append({'id': next_shot_id(edited['shots']), 'type': None, 'action': ""})
+            # The backend numbers it; an id no shot has keeps it from taking another shot's frames.
+            edited['shots'].append({'id': "new", 'type': None, 'action': ""})
         if actions['delete']:
             deleted = scene_id
         changed = changed or bool(removed) or actions['add'] or actions['delete']
@@ -145,18 +135,18 @@ def main() -> None:
 
     if not changed:
         return
-    try:
+    with show_errors():
         api.put(episode_url(world, episode), json={**script, **header, 'scenes': edited_scenes})
+        # Shots are renumbered on save: new widget keys make every field reload from the saved script.
+        st.session_state.script_revision += 1
         if deleted:
             api.delete(f"{episode_url(world, episode)}/scenes/{deleted}")
             notify('success', f"Deleted **{deleted}**.")
-        if new_scene_clicked:
+        elif new_scene_clicked:
             created = api.post(f"{episode_url(world, episode)}/scenes", json={'name': new_scene})
             notify('success', f"Added **{created['name']}**.")
-    except api.ApiError as exc:
-        st.error(str(exc))
-        return
-    notify('success', "Script saved.")
+        else:
+            notify('success', "Script saved.")
 
 
 main()

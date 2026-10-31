@@ -11,9 +11,9 @@ from PIL import Image
 
 import api
 from shared.state import notify, show_notice
+from shared.ui import grid, open_asset, open_script, plural, show_errors
 from shared.worlds import render_world_switcher
 
-COLUMNS = 3
 ASSET_TABS = {'character': "Characters", 'location': "Locations", 'object': "Objects"}
 THUMBNAIL = (960, 540)
 
@@ -31,11 +31,6 @@ def thumbnail(path: str, mtime: float) -> str:
 def stay_on(tab: str) -> None:
     """Reopen ``tab`` after the next rerun, which would otherwise show the first one."""
     st.session_state.world_tab = tab
-
-
-def open_asset(asset_type: str, name: str) -> None:
-    st.session_state.current_asset = (asset_type, name)
-    st.switch_page("pages/asset.py")
 
 
 def render_tile(world: str, asset: dict) -> None:
@@ -58,8 +53,8 @@ def render_tile(world: str, asset: dict) -> None:
     with st.expander("Details"):
         if asset['description']:
             st.write(asset['description'])
-        count = len(asset['variations'])
-        st.caption(f"{count} {'view' if asset_type == 'location' else 'variation'}{'s' if count != 1 else ''}"
+        noun = 'view' if asset_type == 'location' else 'variation'
+        st.caption(plural(len(asset['variations']), noun)
                    + (f" · preferred: {asset['preferred']}" if asset['preferred'] else ""))
         confirmed = st.checkbox("Confirm delete", key=f"confirm_{asset_type}_{name}")
         if st.button("Delete", icon=":material/delete:", disabled=not confirmed, key=f"delete_{asset_type}_{name}",
@@ -77,14 +72,11 @@ def render_new_asset(world: str, asset_type: str) -> None:
         description = st.text_area("Description", key=f"new_description_{asset_type}", height=120)
         if st.button("Create", disabled=not (name.strip() and description.strip()), key=f"new_go_{asset_type}"):
             stay_on(ASSET_TABS[asset_type])
-            try:
+            with show_errors():
                 created = api.post("/assets", json={
                     'world': world, 'asset_type': asset_type, 'name': name, 'description': description,
                 })['asset']
-            except api.ApiError as exc:
-                st.error(str(exc))
-                return
-            open_asset(asset_type, created['name'])
+                open_asset(asset_type, created['name'])
 
 
 def render_assets(world: str, asset_type: str) -> None:
@@ -93,10 +85,9 @@ def render_assets(world: str, asset_type: str) -> None:
     if not assets:
         st.info(f"No {asset_type}s in {world} yet.")
         return
-    for row_start in range(0, len(assets), COLUMNS):
-        for column, asset in zip(st.columns(COLUMNS), assets[row_start:row_start + COLUMNS]):
-            with column:
-                render_tile(world, asset)
+    for column, asset in grid(assets):
+        with column:
+            render_tile(world, asset)
 
 
 def render_new_episode(world: str) -> None:
@@ -110,15 +101,11 @@ def render_new_episode(world: str) -> None:
                                     help="Every frame of the episode uses this aspect ratio.")
         if st.button("Create", disabled=not title.strip(), key="new_episode_go"):
             stay_on("Episodes")
-            try:
+            with show_errors():
                 created = api.post(f"/worlds/{world}/episodes", json={
                     'title': title, 'synopsis': synopsis, 'aspect_ratio': aspect_ratio,
                 })['name']
-            except api.ApiError as exc:
-                st.error(str(exc))
-                return
-            st.session_state.current_episode = created
-            st.switch_page("pages/script.py")
+                open_script(created)
 
 
 def render_episodes(world: str) -> None:
@@ -134,8 +121,7 @@ def render_episodes(world: str) -> None:
         if episode['synopsis']:
             info_col.write(episode['synopsis'])
         if open_col.button("Open script", key=f"open_{episode['name']}", width='stretch'):
-            st.session_state.current_episode = episode['name']
-            st.switch_page("pages/script.py")
+            open_script(episode['name'])
         with open_col.popover("Delete", width='stretch'):
             st.warning(
                 f"All {episode['scene_count']} scenes and every shot image in **{episode['name']}** "

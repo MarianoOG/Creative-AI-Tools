@@ -13,6 +13,8 @@ def init_session_state() -> None:
         'current_episode': None,
         # The (asset_type, name) the Asset page opens on.
         'current_asset': None,
+        # Bumped on every Script page save, so its fields reload from the saved script.
+        'script_revision': 0,
         # One-shot (kind, text) message shown after the rerun that caused it.
         'notice': None,
     }
@@ -32,3 +34,9 @@ def show_notice() -> None:
         kind, text = st.session_state.notice
         getattr(st, kind)(text)
         st.session_state.notice = None
+
+
+def select_world(world: str) -> None:
+    """Switch every page to ``world``. The episode picked in the old one does not carry over."""
+    st.session_state.current_world = world
+    st.session_state.current_episode = None

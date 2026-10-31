@@ -7,6 +7,7 @@ from typing import Dict, Tuple
 import streamlit as st
 
 import api
+from shared.state import select_world
 
 
 def render_world_switcher() -> Tuple[str, Dict]:
@@ -26,9 +27,7 @@ def render_world_switcher() -> Tuple[str, Dict]:
         chosen = st.selectbox("World", worlds, index=worlds.index(current))
 
     if chosen != current:
-        state = st.session_state
-        state.current_world = chosen
-        state.current_episode = None
+        select_world(chosen)
         st.rerun()
 
     return chosen, payload

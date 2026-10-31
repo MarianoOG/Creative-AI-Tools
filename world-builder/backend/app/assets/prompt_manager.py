@@ -161,6 +161,8 @@ LOCATION_VIEWS: dict[str, str] = {
         "framed as a backdrop a character could stand in, with the ground visible. "
     ),
 }
+#: The view a location is first rendered in, and the one its other views are drawn from.
+ESTABLISHING_VIEW = next(iter(LOCATION_VIEWS))
 _LOCATION_TAIL = "No text, no signage lettering, no watermarks, no borders."
 
 _SHOT_TAIL = (
@@ -288,7 +290,7 @@ def build_prompt(
     description: str,
     style: str,
     clause: str | None = None,
-    view: str = "establishing",
+    view: str = ESTABLISHING_VIEW,
 ) -> str:
     """Compose the full prompt for one image. For a final frame, ``description`` is the situation to depict.
 
@@ -298,7 +300,7 @@ def build_prompt(
     if asset_type not in FRAMING:
         raise ValueError(f"asset_type must be one of {sorted(FRAMING)}, got {asset_type!r}")
     if not style.strip():
-        raise ValueError("this world has no style yet - write one in the sidebar")
+        raise ValueError("this world has no style yet - write one in Manage worlds")
     if not description.strip():
         raise ValueError("description must not be empty")
 

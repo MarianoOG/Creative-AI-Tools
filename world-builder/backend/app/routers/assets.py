@@ -21,14 +21,16 @@ from app.assets import library, story
 from app.assets.generation import (
     ASPECT_RATIOS, DEFAULT_FINAL_PROVIDER, DEFAULT_PROVIDER, FINAL_PROVIDERS, PROVIDERS, generate_image,
 )
-from app.assets.prompt_manager import ASSET_DIRS, LOCATION_VIEWS, STYLES, build_prompt, variation_description
-from app.assets.worlds import DEFAULT_WORLD, list_worlds, read_style, slugify, world_dir
+from app.assets.prompt_manager import (
+    ASSET_DIRS, ESTABLISHING_VIEW, LOCATION_VIEWS, STYLES, build_prompt, variation_description,
+)
+from app.assets.worlds import DEFAULT_WORLD, read_style, slugify, world_dir
+from app.routers.common import call, check_world, provider_errors
 
 router = APIRouter(prefix="/assets", tags=["assets"])
 
 #: Asset types whose variations are named freely. Locations have their fixed views instead.
 VARIABLE_TYPES = ("character", "object")
-ESTABLISHING = next(iter(LOCATION_VIEWS))
 #: How many variations of one asset render at once. Provider rate limits are the ceiling.
 PARALLEL_RENDERS = 4
 
@@ -58,9 +60,12 @@ class Regenerate(BaseModel):
     provider: str = DEFAULT_PROVIDER
 
 
+#: A render job: (variation name, what changes, uploaded references).
+Job = Tuple[str, str, List[Path]]
+
+
 def _check(world: str, asset_type: str, allowed=tuple(ASSET_DIRS)) -> None:
-    if world not in list_worlds():
-        raise HTTPException(404, f"no world called {world!r}")
+    check_world(world)
     if asset_type not in allowed:
         raise HTTPException(422, f"asset_type must be one of {sorted(allowed)}")
 
@@ -75,13 +80,6 @@ def _asset(world: str, asset_type: str, name: str) -> Dict:
     if asset is None:
         raise HTTPException(404, f"no {asset_type} called {name!r}")
     return asset
-
-
-def _call(fn, *args, **kwargs):
-    try:
-        return fn(*args, **kwargs)
-    except ValueError as exc:
-        raise HTTPException(400, str(exc)) from exc
 
 
 def _keep_uploads(world: str, label: str, uploads: List[UploadFile]) -> List[Path]:
@@ -101,7 +99,7 @@ def _keep_uploads(world: str, label: str, uploads: List[UploadFile]) -> List[Pat
 def _anchor(world: str, asset_type: str, asset: Dict, variation: str) -> Optional[Path]:
     """The image a variation is drawn from: a location's establishing view, or the preferred image. Never itself."""
     if asset_type == "location":
-        candidates = [ESTABLISHING, asset["preferred"]] if variation != ESTABLISHING else []
+        candidates = [ESTABLISHING_VIEW, asset["preferred"]] if variation != ESTABLISHING_VIEW else []
     else:
         candidates = [asset["preferred"]]
     for name in candidates:
@@ -132,14 +130,12 @@ def _render(world: str, asset_type: str, asset: Dict, variation: str, change: st
         build_prompt(asset_type, description, style)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
-    try:
+    with provider_errors(provider):
         return generate_image(
             asset_type=asset_type, label=f"{asset['name']}-{variation}", description=description, style=style,
             directory=world_dir(world) / ASSET_DIRS[asset_type], provider=provider, references=references,
             clause=clause, **options,
         )
-    except Exception as exc:  # any provider failure: the client gets the reason
-        raise HTTPException(502, f"{provider}: {exc}") from exc
 
 
 def _render_and_save(world: str, asset_type: str, name: str, variation: str, change: str, provider: str,
@@ -153,7 +149,7 @@ def _render_and_save(world: str, asset_type: str, name: str, variation: str, cha
     return library.put_variation(world, asset_type, name, entry)
 
 
-def _render_many(world: str, asset_type: str, name: str, jobs: List[Tuple[str, str, List[Path]]],
+def _render_many(world: str, asset_type: str, name: str, jobs: List[Job],
                  provider: str, anchor: Optional[str] = None) -> Dict:
     """Render ``(variation, change, uploads)`` jobs, each saved as it lands.
 
@@ -163,7 +159,7 @@ def _render_many(world: str, asset_type: str, name: str, jobs: List[Tuple[str, s
     first = [job for job in jobs if job[0] == anchor]
     rest = [job for job in jobs if job[0] != anchor]
 
-    def render(job: Tuple[str, str, List[Path]]) -> Optional[str]:
+    def render(job: Job) -> Optional[str]:
         variation, change, uploads = job
         try:
             _render_and_save(world, asset_type, name, variation, change, provider, uploads)
@@ -199,7 +195,7 @@ def options() -> Dict:
 def get_assets(world: str, asset_type: Optional[str] = None) -> Dict:
     """One world's characters, objects and locations, in ``world.json`` order, each with its variations."""
     _check(world, asset_type or "character")
-    return {"assets": _call(library.list_assets, world, asset_type)}
+    return {"assets": call(library.list_assets, world, asset_type)}
 
 
 @router.post("", status_code=201)
@@ -211,7 +207,7 @@ def create(body: NewAsset) -> Dict:
         raise HTTPException(422, "That name has no usable characters - try letters or digits.")
     if not body.description.strip():
         raise HTTPException(422, "Describe the asset.")
-    return {"asset": _call(library.create_asset, body.world, body.asset_type, name, body.description.strip())}
+    return {"asset": call(library.create_asset, body.world, body.asset_type, name, body.description.strip())}
 
 
 @router.patch("")
@@ -224,7 +220,7 @@ def edit(body: AssetEdit) -> Dict:
     _asset(body.world, body.asset_type, body.name)
     if body.description is not None and not body.description.strip():
         raise HTTPException(422, "The description must not be empty.")
-    name = _call(library.edit_asset, body.world, body.asset_type, body.name,
+    name = call(library.edit_asset, body.world, body.asset_type, body.name,
                  new_name=body.new_name, description=body.description, preferred=body.preferred)
     if name != body.name:
         story.rename_references(body.world, ASSET_DIRS[body.asset_type], body.name, name)
@@ -236,9 +232,9 @@ def remove(world: str, asset_type: str, name: str, variation: Optional[str] = No
     """Drop an asset (or one of its variations) from ``world.json``. Its image files stay in the data folder."""
     _check(world, asset_type)
     if variation:
-        _call(library.remove_variation, world, asset_type, name, variation)
+        call(library.remove_variation, world, asset_type, name, variation)
     else:
-        _call(library.remove_asset, world, asset_type, name)
+        call(library.remove_asset, world, asset_type, name)
 
 
 @router.post("/variations")
@@ -287,9 +283,9 @@ def add_views(
     missing = [view for view in LOCATION_VIEWS if library.variation_named(asset, view) is None]
     if not missing:
         raise HTTPException(409, f"{name!r} already has every view - regenerate one instead.")
-    references = _keep_uploads(world, f"{name}-{ESTABLISHING}", uploads) if ESTABLISHING in missing else []
-    jobs = [(view, "", references if view == ESTABLISHING else []) for view in missing]
-    return _render_many(world, "location", name, jobs, provider, anchor=ESTABLISHING)
+    references = _keep_uploads(world, f"{name}-{ESTABLISHING_VIEW}", uploads) if ESTABLISHING_VIEW in missing else []
+    jobs = [(view, "", references if view == ESTABLISHING_VIEW else []) for view in missing]
+    return _render_many(world, "location", name, jobs, provider, anchor=ESTABLISHING_VIEW)
 
 
 @router.post("/regenerate")
@@ -309,12 +305,10 @@ def regenerate(body: Regenerate) -> Dict:
             raise HTTPException(404, f"{body.name!r} has no variation called {body.variation!r}")
         names = [body.variation]
     else:
-        first = ESTABLISHING if body.asset_type == "location" else asset["preferred"]
+        first = ESTABLISHING_VIEW if body.asset_type == "location" else asset["preferred"]
         names = sorted((v["name"] for v in asset["variations"]), key=lambda n: n != first)
         if not names:
             raise HTTPException(409, f"{body.name!r} has no variations yet.")
-    jobs = []
-    for variation_name in names:
-        variation = library.variation_named(asset, variation_name)
-        jobs.append((variation_name, variation["description"], library.reference_files(body.world, variation)))
+    variations = [library.variation_named(asset, variation_name) for variation_name in names]
+    jobs = [(v["name"], v["description"], library.reference_files(body.world, v)) for v in variations]
     return _render_many(body.world, body.asset_type, body.name, jobs, body.provider, anchor=first)

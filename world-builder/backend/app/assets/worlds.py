@@ -20,9 +20,9 @@ import os
 import re
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
-from app.assets.prompt_manager import ASSET_DIRS, LEGACY_STYLE_SLUGS, LOCATION_VIEWS
+from app.assets.prompt_manager import ASSET_DIRS, ESTABLISHING_VIEW, LEGACY_STYLE_SLUGS
 from app.settings import WORLDS_DIR
 
 #: The world listed when there is none on disk yet.
@@ -50,11 +50,39 @@ def slugify(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
 
 
+def _a(what: str) -> str:
+    """``what`` with its indefinite article: "a world", "an episode"."""
+    return f"{'an' if what[0] in 'aeiou' else 'a'} {what}"
+
+
+def child_dir(parent: Path, name: str, what: str) -> Path:
+    """The folder ``name`` in ``parent``. Anything that is not already a slug (``..``, ``a/b``) is refused."""
+    if not name or name != slugify(name):
+        raise ValueError(f"not a usable {what} name: {name!r}")
+    return parent / name
+
+
+def new_child_dir(parent: Path, name: str, what: str) -> Path:
+    """Where a new ``what`` typed as ``name`` goes in ``parent``, refusing a name that is empty or taken. Not created."""
+    slug = slugify(name)
+    if not slug:
+        raise ValueError(f"{_a(what)} name needs at least one letter or digit")
+    directory = parent / slug
+    if directory.exists():
+        raise ValueError(f"{_a(what)} called {slug!r} already exists")
+    return directory
+
+
+def existing_dir(directory: Path, what: str) -> Path:
+    """``directory``, refusing it if it is not on disk."""
+    if not directory.is_dir():
+        raise ValueError(f"no {what} called {directory.name!r}")
+    return directory
+
+
 def world_dir(world: str) -> Path:
-    """The folder for one world. Anything that is not already a slug (``..``, ``a/b``) is refused."""
-    if not world or world != slugify(world):
-        raise ValueError(f"not a usable world name: {world!r}")
-    return WORLDS_DIR / world
+    """The folder for one world."""
+    return child_dir(WORLDS_DIR, world, "world")
 
 
 def list_worlds() -> List[str]:
@@ -85,7 +113,7 @@ def images_in(directory: Path) -> List[Path]:
 
 
 def first_variation(asset_type: str) -> str:
-    return next(iter(LOCATION_VIEWS)) if asset_type == "location" else LEGACY_VARIATION
+    return ESTABLISHING_VIEW if asset_type == "location" else LEGACY_VARIATION
 
 
 def legacy_name(path: Path) -> Tuple[str, str]:
@@ -144,16 +172,22 @@ def _clean_variation(raw: Dict) -> Optional[Dict]:
     }
 
 
+def _unique(raws: Iterable[Dict], clean: Callable[[Dict], Optional[Dict]]) -> List[Dict]:
+    """Each raw entry cleaned, dropping the unusable ones and any whose name came earlier."""
+    entries, seen = [], set()
+    for raw in raws:
+        entry = clean(raw)
+        if entry and entry["name"] not in seen:
+            seen.add(entry["name"])
+            entries.append(entry)
+    return entries
+
+
 def _clean_asset(raw: Dict) -> Optional[Dict]:
     name = slugify(str(raw.get("name", "")))
-    variations, seen = [], set()
-    for variation in raw.get("variations", []):
-        variation = _clean_variation(variation)
-        if variation and variation["name"] not in seen:
-            seen.add(variation["name"])
-            variations.append(variation)
     if not name:
         return None
+    variations = _unique(raw.get("variations", []), _clean_variation)
     names = [v["name"] for v in variations]
     # The preferred variation is always one that exists; ``None`` only while there are none.
     preferred = raw.get("preferred") if raw.get("preferred") in names else (names[0] if names else None)
@@ -166,16 +200,10 @@ def _clean_asset(raw: Dict) -> Optional[Dict]:
 
 
 def _normalise(raw: Dict) -> World:
-    world: World = {"style": str(raw.get("style", "")).strip()}
-    for folder in ASSET_DIRS.values():
-        assets, seen = [], set()
-        for asset in raw.get(folder, []):
-            asset = _clean_asset(asset)
-            if asset and asset["name"] not in seen:
-                seen.add(asset["name"])
-                assets.append(asset)
-        world[folder] = assets
-    return world
+    return {
+        "style": str(raw.get("style", "")).strip(),
+        **{folder: _unique(raw.get(folder, []), _clean_asset) for folder in ASSET_DIRS.values()},
+    }
 
 
 def write_json(path: Path, data: Any) -> None:
@@ -213,19 +241,9 @@ def write_style(world: str, style: str) -> None:
     save_world(world, {**read_world(world), "style": style})
 
 
-def _new_world_dir(name: str) -> Path:
-    world = slugify(name)
-    if not world:
-        raise ValueError("a world name needs at least one letter or digit")
-    directory = world_dir(world)
-    if directory.exists():
-        raise ValueError(f"a world called {world!r} already exists")
-    return directory
-
-
 def create_world(name: str, style: str = "") -> str:
     """Make a new world with its ``world.json`` and return its slug."""
-    directory = _new_world_dir(name)
+    directory = new_child_dir(WORLDS_DIR, name, "world")
     directory.mkdir(parents=True)
     save_world(directory.name, {"style": style})
     return directory.name
@@ -235,19 +253,15 @@ def rename_world(world: str, new_name: str) -> str:
     """Rename a world in place and return the new slug."""
     if slugify(new_name) == world:
         return world
-    source = world_dir(world)
-    if not source.is_dir():
-        raise ValueError(f"no world called {world!r}")
-    destination = _new_world_dir(new_name)
+    source = existing_dir(world_dir(world), "world")
+    destination = new_child_dir(WORLDS_DIR, new_name, "world")
     source.rename(destination)
     return destination.name
 
 
 def delete_world(world: str) -> None:
     """Hide a world: its folder moves into ``.deleted/``."""
-    directory = world_dir(world)
-    if not directory.is_dir():
-        raise ValueError(f"no world called {world!r}")
+    directory = existing_dir(world_dir(world), "world")
     if len(list_worlds()) <= 1:
         raise ValueError("the last world cannot be deleted")
     move_to_deleted(directory)

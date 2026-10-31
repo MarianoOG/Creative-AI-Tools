@@ -45,11 +45,12 @@ def generate_shots(world: str, episode: str, shots: List[Tuple[str, str]], what:
                     status.write(f"`{futures[future]}` failed ({done}/{len(shots)}).")
     if warnings:
         notify('warning', f"Generated {len(shots) - len(warnings)} of {len(shots)} {what}(s). Failed: " + "; ".join(warnings))
-    notify('success', f"Generated {len(shots)} {what}(s).")
+    else:
+        notify('success', f"Generated {len(shots)} {what}(s).")
 
 
-def pick_episode(world: str) -> Optional[str]:
-    """The episode select box. Remembers the choice in ``current_episode``."""
+def pick_episode(world: str, container=st) -> Optional[str]:
+    """The episode select box, drawn in ``container`` (the page, or ``st.sidebar``). Remembers the choice in ``current_episode``."""
     episodes = api.get(f"/worlds/{world}/episodes")['episodes']
     if not episodes:
         st.info(f"No episodes in **{world}** yet. Create one from the Episodes tab of the World page.")
@@ -59,12 +60,10 @@ def pick_episode(world: str) -> Optional[str]:
     names = [episode['name'] for episode in episodes]
     titles = {episode['name']: episode['title'] for episode in episodes}
     current = st.session_state.current_episode if st.session_state.current_episode in names else names[0]
-    chosen = st.selectbox(
+    st.session_state.current_episode = container.selectbox(
         "Episode", names, index=names.index(current), format_func=lambda n: f"{n} · {titles[n]}"
     )
-    if chosen != st.session_state.current_episode:
-        st.session_state.current_episode = chosen
-    return chosen
+    return st.session_state.current_episode
 
 
 def asset_names(world: str) -> Dict[str, List[str]]:

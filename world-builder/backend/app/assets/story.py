@@ -8,11 +8,15 @@ order and content. A scene folder missing from the script is read as an empty
 scene, and a script entry without a folder is dropped. The episode's
 ``aspect_ratio`` is used for every shot in it.
 
-A shot's ``final`` is its high-fidelity frame, saved in its scene folder as
+A shot's ``final`` is its frame, saved in its scene folder as
 ``{uuid8}-{shot}-final``; regenerating points it at a new file and leaves the
 old one on disk. ``image`` names an older storyboard preview, kept as it is;
-nothing renders one any more. ``final_provider`` is the model the last high-fidelity
-pass of the episode used (OpenAI or Gemini).
+nothing renders one any more. ``final_provider`` is the model the last
+pass of the episode used (one of ``FINAL_PROVIDERS``).
+
+A shot's ``id`` is its place in the scene (``shot1``, ``shot2``...), set on
+every read and save, so shots cannot be named. Removing one moves the later
+ones up, each keeping its frames.
 
 A shot's ``type`` is its framing, one of ``SHOT_TYPES`` (or ``null`` when not
 picked); it leads the shot's description (:func:`shot_description`).
@@ -24,7 +28,7 @@ script.json::
       "scenes": [{
         "id": "scene1", "heading": "INT. KITCHEN - DAY", "summary": "...",
         "characters": ["fox", "fox:older"], "locations": ["kitchen"], "objects": ["lantern"],
-        "shots": [{"id": "shot_1", "type": "Wide shot", "action": "...", "image": "1a2b3c4d-shot_1.png", "final": "5e6f7a8b-shot_1-final.jpg"}]
+        "shots": [{"id": "shot1", "type": "Wide shot", "action": "...", "image": "1a2b3c4d-shot1.png", "final": "5e6f7a8b-shot1-final.jpg"}]
       }]
     }
 
@@ -41,7 +45,10 @@ from typing import Any, Dict, List, Optional
 
 from app.assets.generation import ASPECT_RATIOS, DEFAULT_FINAL_PROVIDER, FINAL_PROVIDERS
 from app.assets.prompt_manager import ASSET_DIRS
-from app.assets.worlds import images_in, legacy_name, move_to_deleted, slugify, subfolders, world_dir, write_json
+from app.assets.worlds import (
+    child_dir, existing_dir, images_in, legacy_name, move_to_deleted, new_child_dir, slugify, subfolders, world_dir,
+    write_json,
+)
 from app.settings import relative
 
 SCRIPT_FILE = "script.json"
@@ -66,22 +73,16 @@ def _natural(name: str) -> list:
     return [int(part) if part.isdigit() else part for part in re.split(r"(\d+)", name)]
 
 
-def _segment(parent: Path, name: str, what: str) -> Path:
-    if not name or name != slugify(name):
-        raise ValueError(f"not a usable {what} name: {name!r}")
-    return parent / name
-
-
 def episodes_dir(world: str) -> Path:
     return world_dir(world) / "episodes"
 
 
 def episode_dir(world: str, episode: str) -> Path:
-    return _segment(episodes_dir(world), episode, "episode")
+    return child_dir(episodes_dir(world), episode, "episode")
 
 
 def scene_dir(world: str, episode: str, scene: str) -> Path:
-    return _segment(episode_dir(world, episode), scene, "scene")
+    return child_dir(episode_dir(world, episode), scene, "scene")
 
 
 def list_episodes(world: str) -> List[str]:
@@ -107,15 +108,10 @@ def _clean_shot(raw: Dict, folder: Path) -> Dict:
 
 
 def _clean_scene(raw: Dict, scene_id: str, folder: Path) -> Dict:
-    shots, seen = [], set()
-    for number, shot in enumerate(raw.get("shots", []), start=1):
-        shot = _clean_shot(shot, folder)
-        # Ids name the frame files, so they must be unique and non-empty.
-        while not shot["id"] or shot["id"] in seen:
-            shot["id"] = f"shot_{number}"
-            number += 1
-        seen.add(shot["id"])
-        shots.append(shot)
+    shots = [_clean_shot(shot, folder) for shot in raw.get("shots", [])]
+    # Shots are not named: each one's id is its place in the scene.
+    for number, shot in enumerate(shots, start=1):
+        shot["id"] = f"shot{number}"
     return {
         "id": scene_id,
         "heading": str(raw.get("heading", "")),
@@ -141,10 +137,7 @@ def _normalise(world: str, episode: str, raw: Dict) -> Script:
 
 
 def read_script(world: str, episode: str) -> Script:
-    directory = episode_dir(world, episode)
-    if not directory.is_dir():
-        raise ValueError(f"no episode called {episode!r}")
-    path = directory / SCRIPT_FILE
+    path = existing_dir(episode_dir(world, episode), "episode") / SCRIPT_FILE
     raw = json.loads(path.read_text()) if path.is_file() else {}
     return _normalise(world, episode, raw)
 
@@ -152,29 +145,26 @@ def read_script(world: str, episode: str) -> Script:
 def save_script(world: str, episode: str, raw: Dict) -> Script:
     """Save a script. A shot or setting the client left out keeps what is on disk, so a page that only edits text never drops an image."""
     with _lock:
-        return _save_script(world, episode, raw)
-
-
-def _save_script(world: str, episode: str, raw: Dict) -> Script:
-    current = read_script(world, episode)
-    frames = {
-        (scene["id"], shot["id"]): {"image": shot["image"], "final": shot["final"]}
-        for scene in current["scenes"] for shot in scene["shots"]
-    }
-    raw = {
-        **{key: current[key] for key in ("aspect_ratio", "final_provider")},
-        **raw,
-        "scenes": [
-            {**scene, "shots": [
-                {**frames.get((scene.get("id"), slugify(str(shot.get("id", "")))), {}), **shot}
-                for shot in scene.get("shots", [])
-            ]}
-            for scene in raw.get("scenes", current["scenes"])
-        ],
-    }
-    script = _normalise(world, episode, raw)
-    write_json(episode_dir(world, episode) / SCRIPT_FILE, script)
-    return script
+        current = read_script(world, episode)
+        frames = {
+            (scene["id"], shot["id"]): {"image": shot["image"], "final": shot["final"]}
+            for scene in current["scenes"] for shot in scene["shots"]
+        }
+        raw = {
+            "aspect_ratio": current["aspect_ratio"],
+            "final_provider": current["final_provider"],
+            **raw,
+            "scenes": [
+                {**scene, "shots": [
+                    {**frames.get((scene.get("id"), slugify(str(shot.get("id", "")))), {}), **shot}
+                    for shot in scene.get("shots", [])
+                ]}
+                for scene in raw.get("scenes", current["scenes"])
+            ],
+        }
+        script = _normalise(world, episode, raw)
+        write_json(episode_dir(world, episode) / SCRIPT_FILE, script)
+        return script
 
 
 def with_images(world: str, episode: str, script: Script) -> Script:
@@ -206,12 +196,7 @@ def set_shot_image(world: str, episode: str, scene: str, shot: str, image: Path,
 
 
 def _new_dir(parent: Path, name: str, what: str) -> Path:
-    slug = slugify(name)
-    if not slug:
-        raise ValueError(f"an {what} name needs at least one letter or digit")
-    directory = parent / slug
-    if directory.exists():
-        raise ValueError(f"an {what} called {slug!r} already exists")
+    directory = new_child_dir(parent, name, what)
     directory.mkdir(parents=True)
     return directory
 
@@ -225,10 +210,7 @@ def create_episode(world: str, title: str, synopsis: str = "", aspect_ratio: str
 
 def delete_episode(world: str, episode: str) -> None:
     """Hide an episode with all its scenes and shots: its folder moves into ``episodes/.deleted/``."""
-    directory = episode_dir(world, episode)
-    if not directory.is_dir():
-        raise ValueError(f"no episode called {episode!r}")
-    move_to_deleted(directory)
+    move_to_deleted(existing_dir(episode_dir(world, episode), "episode"))
 
 
 def create_scene(world: str, episode: str, name: str) -> str:
@@ -241,10 +223,7 @@ def create_scene(world: str, episode: str, name: str) -> str:
 
 def delete_scene(world: str, episode: str, scene: str) -> None:
     """Hide a scene with all its shots: its folder moves into the episode's ``.deleted/``."""
-    directory = scene_dir(world, episode, scene)
-    if not directory.is_dir():
-        raise ValueError(f"no scene called {scene!r}")
-    move_to_deleted(directory)
+    move_to_deleted(existing_dir(scene_dir(world, episode, scene), "scene"))
     save_script(world, episode, read_script(world, episode))
 
 

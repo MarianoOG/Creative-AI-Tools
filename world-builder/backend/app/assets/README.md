@@ -8,7 +8,7 @@ Gemini (Nano Banana 2) or Runware (Flux 2 Klein), always in the world's style:
 | `character` | Turnaround sheet: front, three-quarter, back on white | inspiration (uploads) |
 | `object` | Turnaround sheet: front isometric and side views on white | inspiration (uploads) |
 | `location` | Empty background plate, no figures, in three views | inspiration (uploads) |
-| `final` | A shot's high-fidelity frame | the scene's assets as designs to reproduce faithfully |
+| `final` | A shot's frame | the scene's assets as designs to reproduce faithfully |
 
 An asset is created as just a name and a description, with no images. Its
 images are **variations**, each with a name, and one is **preferred** (the
@@ -112,10 +112,10 @@ scene entry without a folder is dropped on the next save.
     "summary": "What happens in the scene.",
     "characters": ["fox_hero:older"], "locations": ["night_market"], "objects": ["brass_lantern"],
     "shots": [{
-      "id": "market_night",
+      "id": "shot1",
       "action": "The fox walks down the wet street, lantern raised.",
-      "image": "9c0d1e2f-market_night.png",
-      "final": "3a4b5c6d-market_night-final.jpg"
+      "image": "9c0d1e2f-shot1.png",
+      "final": "3a4b5c6d-shot1-final.jpg"
     }]
   }]
 }
@@ -123,11 +123,13 @@ scene entry without a folder is dropped on the next save.
 
 `characters`, `locations` and `objects` hold references: `name` for an asset's
 preferred image, `name:variation` for a specific one (`fox_hero:older`,
-`night_market:reverse`). A shot's `final` is its high-fidelity frame in the
+`night_market:reverse`). A shot's `final` is its frame in the
 scene folder. Its `image` names an older storyboard preview, kept as it is
 (nothing renders one any more; scripts from before it get the newest file
 named after the shot); `final_provider` is the model the
-episode's last one used.
+episode's last one used. A shot's `id` is its place in the scene (`shot1`,
+`shot2`...), set on every read and save, so shots are never named; removing
+one moves the later ones up, each keeping its frames.
 
 ## Generating
 
