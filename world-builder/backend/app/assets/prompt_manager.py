@@ -1,12 +1,10 @@
-"""Prompt composition for characters, objects, locations and storyboard shots. Pure data plus :func:`build_prompt`, no I/O.
+"""Prompt composition for characters, objects, locations and final frames. Pure data plus :func:`build_prompt`, no I/O.
 
 A prompt is ``description -> style clause -> framing -> reference clause``.
 Framing comes after the style, so it has the last word on layout and lighting.
 The style clause is the world's style (in ``world.json``); :data:`STYLES` are the presets
-new worlds start from. Storyboard shots use it too, as a quick low detailed
-view drawn from text alone (no reference images) that is about composition and
-lighting; a shot's final frame is the finished version, drawn from the
-storyboard frame and the scene's designs.
+new worlds start from. A shot's final frame is rendered in it, drawn from the
+scene's designs and the shot's text.
 """
 
 from __future__ import annotations
@@ -97,6 +95,12 @@ STYLES: dict[str, str] = {
         "recognisable by silhouette and structure alone. Ready for print or "
         "colouring-book use."
     ),
+    "storyboard_marker": (
+        "Rough storyboard sketch style, drawn fast with a black marker and grey "
+        "marker tones on pale paper: bold, loose, quick and dirty strokes, big "
+        "solid black shadow masses and bare paper for the lit areas, hard "
+        "contrast between light and shadow."
+    ),
 }
 
 #: Style slots older filenames carry (``{name}_{style}_{uuid8}_{provider}``). New files have none.
@@ -159,22 +163,6 @@ LOCATION_VIEWS: dict[str, str] = {
 }
 _LOCATION_TAIL = "No text, no signage lettering, no watermarks, no borders."
 
-_SHOT_COMPOSITION = (
-    "Render this as a low detailed view: a single storyboard frame depicting "
-    "the situation described above, in the style above but simplified, with "
-    "broad shapes, little texture and no fine detail, so the frame is about "
-    "composition and lighting only. Compose it like a film frame: choose a "
-    "deliberate camera angle and shot size, frame the subject through "
-    "foreground elements, and give it layered depth and a clear focal point. "
-    "Every character and object mentioned has a readable place in the frame "
-    "and keeps its key identifying features, so it is easy to tell who and "
-    "what is in it. "
-)
-_SHOT_LIGHTING = (
-    "Light it dramatically: high-contrast light with big masses of shadow, "
-    "silhouettes against bright windows or light sources, and light and shadow "
-    "leading the eye to the focal subject. "
-)
 _SHOT_TAIL = (
     "Exactly one single frame filling the whole image: no panels, no grid, no "
     "comic strip, no vignettes, no inset images and no frames within the frame. "
@@ -210,14 +198,12 @@ FRAMING: dict[str, str] = {
     "character": CHARACTER_FRAMING,
     "object": OBJECT_FRAMING,
     "location": _LOCATION_COMPOSITION + "{view}" + _LOCATION_LIGHTING + _LOCATION_TAIL,
-    "shot": _SHOT_COMPOSITION + _SHOT_LIGHTING + _SHOT_TAIL,
     "final": _FINAL_COMPOSITION + _FINAL_LIGHTING + _SHOT_TAIL,
 }
 
 #: Framings for line-only styles. Matched on the exact preset text, so an edited style gets the default framing.
 MONOCHROME_FRAMING: dict[str, str] = {
     "location": _LOCATION_COMPOSITION + "{view}" + _MONOCHROME_RENDERING + _LOCATION_TAIL,
-    "shot": _SHOT_COMPOSITION + _MONOCHROME_RENDERING + _SHOT_TAIL,
     "final": _FINAL_COMPOSITION + _MONOCHROME_RENDERING + _SHOT_TAIL,
 }
 _MONOCHROME_STYLES = {STYLES["ligne_claire_lineart"]}
@@ -281,16 +267,13 @@ REFERENCE_CLAUSES: dict[str, str] = {
     ),
     "final": (
         "The reference images are listed above in the order they are attached. "
-        "The storyboard frame, when there is one, is the plan for this frame: "
-        "keep its composition, camera angle, shot size, staging and lighting, "
-        "but not its rough, simplified rendering. The other references are the "
-        "established designs of the characters, locations and objects in the "
-        "scene, and they are fact, not inspiration: reproduce their identity, "
+        "They are the established designs of the characters, locations and "
+        "objects in the scene, and they are fact, not inspiration: reproduce their identity, "
         "proportions, costume, materials and colour palette exactly. Character "
         "and object references are turnaround sheets on white: draw each subject "
         "once, inside the scene, never as a sheet of views. Location references "
-        "are empty background plates of the place where the frame happens. The "
-        "style is defined by the style description above."
+        "are empty background plates of the place where the frame happens. "
+        "The style is defined by the style description above."
     ),
 }
 
@@ -307,7 +290,7 @@ def build_prompt(
     clause: str | None = None,
     view: str = "establishing",
 ) -> str:
-    """Compose the full prompt for one image. For a shot or a final frame, ``description`` is the situation to depict.
+    """Compose the full prompt for one image. For a final frame, ``description`` is the situation to depict.
 
     ``clause`` names the :data:`REFERENCE_CLAUSES` entry for the attached
     references (``None`` when there are none). ``view`` is the camera of a location.

@@ -1,15 +1,14 @@
 # Worlds, assets and stories
 
-Four kinds of image, each rendered by one provider, OpenAI (`gpt-image-2`) or
-Gemini (Nano Banana 2), always in the world's style:
+Four kinds of image, each rendered by one provider, OpenAI (`gpt-image-2`),
+Gemini (Nano Banana 2) or Runware (Flux 2 Klein, assets only), always in the world's style:
 
 | Type | What it renders | References are treated as |
 | --- | --- | --- |
 | `character` | Turnaround sheet: front, three-quarter, back on white | inspiration (uploads) |
 | `object` | Turnaround sheet: front isometric and side views on white | inspiration (uploads) |
 | `location` | Empty background plate, no figures, in three views | inspiration (uploads) |
-| `shot` | Storyboard frame | none: text only |
-| `final` | A shot's high-fidelity frame | the storyboard frame as the plan, the scene's assets as designs to reproduce faithfully |
+| `final` | A shot's high-fidelity frame | the scene's assets as designs to reproduce faithfully |
 
 An asset is created as just a name and a description, with no images. Its
 images are **variations**, each with a name, and one is **preferred** (the
@@ -53,7 +52,7 @@ data/assets/
             └── <scene>/          the scene's shot images
 ```
 
-New files are named `{uuid8}-{name}-{variation}` (shots: `{uuid8}-{shot}`). Every
+New files are named `{uuid8}-{name}-{variation}` (final frames: `{uuid8}-{shot}-final`). Every
 render gets a new uuid, so nothing is overwritten. OpenAI writes PNG and Gemini
 JPEG; output is 2K.
 
@@ -105,7 +104,6 @@ scene entry without a folder is dropped on the next save.
 {
   "title": "The Lantern",
   "synopsis": "A fox arrives at a night market...",
-  "provider": "openai",
   "aspect_ratio": "landscape",
   "final_provider": "gemini",
   "scenes": [{
@@ -125,9 +123,10 @@ scene entry without a folder is dropped on the next save.
 
 `characters`, `locations` and `objects` hold references: `name` for an asset's
 preferred image, `name:variation` for a specific one (`fox_hero:older`,
-`night_market:reverse`). A shot's `image` is its one frame in the scene folder;
-scripts from before it get the newest file named after the shot. Its `final` is
-its high-fidelity frame, in the same folder; `final_provider` is the model the
+`night_market:reverse`). A shot's `final` is its high-fidelity frame in the
+scene folder. Its `image` names an older storyboard preview, kept as it is
+(nothing renders one any more; scripts from before it get the newest file
+named after the shot); `final_provider` is the model the
 episode's last one used.
 
 ## Generating
@@ -143,21 +142,13 @@ wait for the render and return the result. Each image is rendered by one
 - **style**: always the world's style; generation is refused while it is
   empty. New worlds can start from a preset (`STYLES` in `prompt_manager.py`).
   The `ligne_claire_lineart` preset, kept word for word, also swaps in line-only
-  framing for locations and shots.
+  framing for locations and final frames.
 - **assets**: always landscape (16:9) and high quality. Several renders (a
   location's views, regenerate all) run one after another; if one fails, the
   ones already made are kept and the failure comes back as a `warning`.
-- **shots**: the prompt is the scene heading and summary plus the shot's action,
-  with the description of each character, location and object the scene lists
-  (no images are sent). Every shot is a *low detailed view* in the world's
-  style: simplified, and about composition and lighting only. It renders at low
-  quality and a lower resolution (`SHOT_SIZES` in `generation.py`). The model
-  and aspect ratio (`landscape`, `square`, `portrait`) are the episode's.
-  Regenerating points the shot at the new image.
-- **final frames**: the same endpoint with `{"final": true, "provider": "openai" | "gemini"}`
-  renders the shot's finished, fully detailed frame instead, at high quality and
-  2K in the episode's aspect ratio. It is sent the storyboard frame (to keep its
-  composition, camera and lighting) and the image of every character, location
-  and object the scene lists (as designs to reproduce), plus their
-  descriptions. Regenerating points `final` at the new image; the storyboard
-  frame is untouched.
+- **final frames**: the shot endpoint, with `{"provider": "openai" | "gemini"}`
+  (the episode's last one when left out), renders the shot's finished, fully
+  detailed frame at high quality and 2K in the episode's aspect ratio. It is sent the image of every character,
+  location and object the scene lists (as designs to reproduce, which with the
+  world's style decide the look), plus their descriptions and the shot's text.
+  Regenerating points `final` at the new image.

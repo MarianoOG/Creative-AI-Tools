@@ -1,9 +1,9 @@
 """Storyboard: an episode's high-fidelity final frames in a grid, their generation, and a zip of them all.
 
-The Script page's reference frames stay the quick, low detailed draft. A final
-frame is the finished image of a shot, rendered once by OpenAI or Gemini at high
-quality from the reference frame and the designs of everything the scene lists. Any one can
-be regenerated; the old file stays on disk.
+A final frame is the finished image of a shot, rendered once by OpenAI or Gemini at high quality from
+the shot's text and the designs of everything the scene lists, in the world's
+style. Any one, or once all exist every one, can be
+regenerated; the old file stays on disk.
 """
 
 from __future__ import annotations
@@ -83,32 +83,37 @@ def main() -> None:
 
     options = api.options()
     providers = options['final_providers']
-    model_col, action_col = st.columns([2, 1], vertical_alignment='bottom')
+    model_col, action_col = st.columns([3, 2], vertical_alignment='bottom')
     provider = model_col.selectbox(
         "Model", providers, index=providers.index(script['final_provider']),
         format_func=options['providers'].get, key=f"final_provider_{world}_{episode}",
     )
     missing = [(scene['id'], shot['id']) for scene, shot in shots if not shot.get('final_path')]
-    generate_all = False
+    generate_all = regenerate_all = False
     with action_col:
         if missing:
             generate_all = st.button(
                 f"Generate {len(missing)} high-fidelity frame(s)", type="primary", width='stretch'
             )
         else:
-            st.download_button(
+            # Regenerate all stays one small icon beside Export; it asks first, as every frame is a paid render.
+            refresh_col, export_col = st.columns([1, 4], vertical_alignment='bottom')
+            with refresh_col.popover("", icon=":material/refresh:", help="Regenerate all frames", width='stretch'):
+                st.write(f"Render all {len(shots)} high-fidelity frames again? The current files stay on disk.")
+                regenerate_all = st.button("Regenerate all", icon=":material/refresh:", type="primary")
+            export_col.download_button(
                 "Export all frames", data=build_zip(export_files(script)), file_name=f"{world}_{episode}.zip",
                 mime="application/zip", type="primary", icon=":material/download:", width='stretch',
             )
-    no_storyboard = sum(1 for _, shot in shots if not shot.get('path'))
-    if no_storyboard:
-        st.caption(f"{no_storyboard} shot(s) have no reference frame, so theirs are drawn from text and the scene's designs alone.")
 
     st.divider()
     clicked = render_grid(script)
-    to_generate = missing if generate_all else clicked
+    if regenerate_all:
+        to_generate = [(scene['id'], shot['id']) for scene, shot in shots]
+    else:
+        to_generate = missing if generate_all else clicked
     if to_generate:
-        generate_shots(world, episode, to_generate, "high-fidelity frame", {'final': True, 'provider': provider})
+        generate_shots(world, episode, to_generate, "high-fidelity frame", {'provider': provider})
 
 
 main()

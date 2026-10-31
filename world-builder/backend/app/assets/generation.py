@@ -2,10 +2,8 @@
 
 Files are written to the folder the caller passes (an asset-type folder, or a
 scene folder for shots) as ``{uuid8}-{label}``, with the extension of the
-returned bytes (OpenAI PNG, Gemini and Runware JPEG). Assets render at 2K
-(Runware, the cheap and fast storyboard default, at 1280x720); shots, which are
-low detailed views, at a lower resolution (:data:`SHOT_SIZES`). Every render
-gets a new uuid, so nothing is ever overwritten.
+returned bytes (OpenAI PNG, Gemini and Runware JPEG). Everything renders at
+2K. Every render gets a new uuid, so nothing is ever overwritten.
 """
 
 from __future__ import annotations
@@ -33,8 +31,6 @@ PROVIDERS = {
     "runware": "Runware Flux 2 Klein 4B",
 }
 DEFAULT_PROVIDER = "openai"
-#: A new episode's storyboard model: cheaper and faster than the asset default.
-DEFAULT_SHOT_PROVIDER = "runware"
 #: The models a high-fidelity final frame can use, and the default one.
 FINAL_PROVIDERS = ("openai", "gemini")
 DEFAULT_FINAL_PROVIDER = "gemini"
@@ -48,16 +44,8 @@ OPENAI_SIZES = {"16:9": "2048x1152", "1:1": "2048x2048", "9:16": "1152x2048"}
 #: Provider -> the most reference images it takes (the API limits).
 MAX_REFERENCES = {"runware": 4, "openai": 16, "gemini": 14}
 
-#: Ratio -> the (width, height) Runware renders.
-RUNWARE_SIZES = {"16:9": (1280, 720), "1:1": (1024, 1024), "9:16": (720, 1280)}
-
-#: Provider -> ratio -> the lower size shots render at. Gemini takes "1K"; gpt-image-2
-#: refuses fewer than about 0.65 megapixels, so 1280x720 is as low as it goes.
-SHOT_SIZES: dict[str, dict[str, Any]] = {
-    "openai": {"16:9": "1280x720", "1:1": "1024x1024", "9:16": "720x1280"},
-    "gemini": {"16:9": "1K", "1:1": "1K", "9:16": "1K"},
-    "runware": {"16:9": (768, 432), "1:1": (576, 576), "9:16": (432, 768)},
-}
+#: Ratio -> the 2K (width, height) Runware renders, the same as gpt-image-2's.
+RUNWARE_SIZES = {"16:9": (2048, 1152), "1:1": (2048, 2048), "9:16": (1152, 2048)}
 
 #: Quality -> (OpenAI ``quality``, Gemini ``thinking_level``). The Gemini model
 #: rejects every thinking level but "high", so below that nothing is sent.
@@ -68,12 +56,10 @@ QUALITY: dict[str, tuple[str, Optional[str]]] = {
     "high": ("high", "high"),
 }
 
-#: Characters, objects and locations are always rendered like this; shots take
-#: their ratio from the episode and are always low quality (storyboard drafts);
-#: final frames take it too, at high quality and full size.
+#: Characters, objects and locations are always rendered like this; final
+#: frames take their ratio from the episode, at high quality.
 ASSET_ASPECT_RATIO = "landscape"
 ASSET_QUALITY = "high"
-SHOT_QUALITY = "low"
 
 _EXTENSIONS = {"PNG": ".png", "JPEG": ".jpg", "WEBP": ".webp"}
 
@@ -190,7 +176,7 @@ def generate_image(
     aspect_ratio: str = ASSET_ASPECT_RATIO,
     quality: str = ASSET_QUALITY,
 ) -> Path:
-    """Render one image (an asset, or a ``"shot"``) with one provider and save it as ``{uuid8}-{label}`` in ``directory``.
+    """Render one image (an asset, or a shot's ``"final"`` frame) with one provider and save it as ``{uuid8}-{label}`` in ``directory``.
 
     ``clause`` says how ``references`` are used (see ``build_prompt``). Raises
     if the provider fails; nothing is written then.
@@ -201,13 +187,12 @@ def generate_image(
     prompt = build_prompt(asset_type, description, style, clause=clause if references else None, view=view)
     ratio = ASPECT_RATIOS[aspect_ratio]
     openai_quality, thinking_level = QUALITY[quality]
-    shot_size = SHOT_SIZES[provider][ratio] if asset_type == "shot" else None
     if provider == "openai":
-        data = _openai_bytes(prompt, shot_size or OPENAI_SIZES[ratio], openai_quality, references)
+        data = _openai_bytes(prompt, OPENAI_SIZES[ratio], openai_quality, references)
     elif provider == "runware":
-        data = _runware_bytes(prompt, shot_size or RUNWARE_SIZES[ratio], references)
+        data = _runware_bytes(prompt, RUNWARE_SIZES[ratio], references)
     else:
-        data = _gemini_bytes(prompt, ratio, shot_size or "2K", thinking_level, references)
+        data = _gemini_bytes(prompt, ratio, "2K", thinking_level, references)
     image_format = Image.open(BytesIO(data)).format
     path = directory / f"{uuid.uuid4().hex[:8]}-{label}{_EXTENSIONS.get(image_format, '.png')}"
     directory.mkdir(parents=True, exist_ok=True)

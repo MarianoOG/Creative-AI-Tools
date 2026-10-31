@@ -1,7 +1,6 @@
 # World Builder
 
-Build **worlds** with OpenAI, Gemini or Runware (Flux 2 Klein 4B, the
-cheap and fast default for storyboard frames). Each world has a `world.json` holding
+Build **worlds** with OpenAI, Gemini or Runware (Flux 2 Klein 4B, cheap and fast). Each world has a `world.json` holding
 its visual style and its **characters**, **locations** and **objects** (with
 their variations), and its **episodes**: scenes made of storyboard shots,
 written in a `script.json`.
@@ -22,8 +21,8 @@ works is in `backend/app/assets/README.md`.
 | --- | --- |
 | World | The world's characters, locations and objects (three columns, each shown by its preferred image) and episodes, one tab each. Create assets (a name and a description) and episodes here. Click an image or Edit to open the asset. |
 | Asset | One asset: edit its name and description, and generate, prefer, regenerate (one or all) and delete its variations, or a location's views. |
-| Script | The whole episode, scene by scene and shot by shot, editable in place: each scene's heading, summary and references, and each shot's type (wide, medium, close-up, panorama, ...) and action, with its small low detailed reference frame on the side. Add and delete scenes and shots, generate or regenerate frames, and set the episode's model and aspect ratio. Any button saves everything typed on the page. |
-| Storyboard | An episode's high-fidelity final frames in a grid, each with a Regenerate button. Generate the missing ones in one click (OpenAI or Gemini, your pick), then download them all as a zip. |
+| Script | The whole episode, scene by scene and shot by shot, editable in place: each scene's heading, summary and references, and each shot's type (wide, medium, close-up, panorama, ...) and action, as text only (nothing is generated here). Add and delete scenes and shots, and set the episode's aspect ratio. Any button saves everything typed on the page. |
+| Storyboard | An episode's high-fidelity final frames in a grid, each with a Regenerate button. Generate the missing ones in one click (OpenAI or Gemini, your pick, drawn from the shot's text and the scene's designs in the world's style), then download them all as a zip. Once all exist, the small refresh icon beside Export regenerates every one (after a confirm). |
 | Manage worlds | Create (from a style preset), rename and delete worlds. |
 
 The sidebar holds the world picker and the world's style, editable in place.

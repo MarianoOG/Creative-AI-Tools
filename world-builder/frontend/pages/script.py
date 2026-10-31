@@ -1,12 +1,9 @@
 """Script: the whole episode, scene by scene and shot by shot, all editable in place.
 
-The script is the main thing. Each shot's reference frame sits small beside its
-text: a quick low detailed view in the world's style, drawn from text alone
-with the episode's model and aspect ratio. Regenerating replaces a shot's
-frame; the old file stays on disk. The finished frames are made on the
+The script is text only: nothing is generated here. The frames are made on the
 Storyboard page.
 
-Every change (save, add, remove, generate, delete) first collects what is typed
+Every change (save, add, remove, delete) first collects what is typed
 anywhere on the page and saves the whole episode, so no unsaved edit is lost.
 """
 
@@ -20,29 +17,26 @@ import streamlit as st
 
 import api
 from shared.state import notify, show_notice
-from shared.story import asset_names, episode_url, generate_shots, pick_episode, references_markdown, scene_fields
-from shared.worlds import model_select, render_world_switcher
+from shared.story import asset_names, episode_url, pick_episode, references_markdown, scene_fields
+from shared.worlds import render_world_switcher
 
 
 def render_header(episode: str, script: Dict) -> Tuple[Dict, bool]:
-    """The episode's title, synopsis and frame settings. Returns them as typed, and whether Save was clicked."""
+    """The episode's title, synopsis and aspect ratio. Returns them as typed, and whether Save was clicked."""
     options = api.options()
-    with st.expander("Edit title, synopsis and reference frame settings"):
+    with st.expander("Edit title, synopsis and aspect ratio"):
         title = st.text_input("Title", value=script['title'], key=f"title_{episode}")
         synopsis = st.text_area("Synopsis", value=script['synopsis'], key=f"synopsis_{episode}")
-        model_col, ratio_col = st.columns(2)
-        with model_col:
-            provider = model_select(options, key=f"provider_{episode}", default=script['provider'])
         ratios = options['aspect_ratios']
-        aspect_ratio = ratio_col.selectbox(
+        aspect_ratio = st.selectbox(
             "Aspect ratio", ratios, index=ratios.index(script['aspect_ratio']), key=f"ratio_{episode}"
         )
-        st.caption("Every reference frame of the episode uses this model and aspect ratio, as a quick low detailed view.")
+        st.caption("Every frame of the episode uses this aspect ratio.")
         clicked = st.button("Save", key=f"save_header_{episode}")
     st.title(script['title'])
     if script['synopsis']:
         st.write(f"*{script['synopsis']}*")
-    fields = {'title': title, 'synopsis': synopsis, 'provider': provider, 'aspect_ratio': aspect_ratio}
+    fields = {'title': title, 'synopsis': synopsis, 'aspect_ratio': aspect_ratio}
     return fields, clicked
 
 
@@ -64,35 +58,21 @@ def next_shot_id(shots: List[Dict]) -> str:
 
 
 def render_shot(shot: Dict, prefix: str, number: int, shot_types: List[str]) -> Dict[str, bool]:
-    """One shot: its type and action, with its reference frame small on the right."""
-    text_col, image_col = st.columns([5, 1])
-    with text_col:
-        id_col, type_col = st.columns([1, 3], vertical_alignment='center')
-        id_col.markdown(f"**{number}.** `{shot['id']}`")
-        type_col.selectbox(
-            "Shot type", shot_types, index=shot_types.index(shot['type']) if shot['type'] in shot_types else None,
-            placeholder="Shot type", label_visibility='collapsed', key=shot_key(prefix, shot, 'type'),
-        )
-        st.text_area(
-            "Action", value=shot['action'], height=action_height(shot['action']),
-            label_visibility='collapsed', placeholder="What happens in this shot", key=shot_key(prefix, shot, 'action'),
-        )
-    with image_col:
-        if shot.get('path'):
-            st.image(str(api.file_path(shot['path'])), width='stretch')
-        else:
-            st.caption("No frame yet.")
-        generate_col, remove_col = st.columns(2)
-        return {
-            'generate': generate_col.button(
-                "", icon=":material/refresh:" if shot.get('path') else ":material/image:",
-                help="Regenerate the frame" if shot.get('path') else "Generate the frame",
-                key=shot_key(prefix, shot, 'generate'), width='stretch',
-            ),
-            'remove': remove_col.button(
-                "", icon=":material/delete:", help="Remove the shot", key=shot_key(prefix, shot, 'remove'), width='stretch'
-            ),
-        }
+    """One shot: its type and action, with a remove button."""
+    id_col, type_col, remove_col = st.columns([1, 3, 0.4], vertical_alignment='center')
+    id_col.markdown(f"**{number}.** `{shot['id']}`")
+    type_col.selectbox(
+        "Shot type", shot_types, index=shot_types.index(shot['type']) if shot['type'] in shot_types else None,
+        placeholder="Shot type", label_visibility='collapsed', key=shot_key(prefix, shot, 'type'),
+    )
+    removed = remove_col.button(
+        "", icon=":material/delete:", help="Remove the shot", key=shot_key(prefix, shot, 'remove'), width='stretch'
+    )
+    st.text_area(
+        "Action", value=shot['action'], height=action_height(shot['action']),
+        label_visibility='collapsed', placeholder="What happens in this shot", key=shot_key(prefix, shot, 'action'),
+    )
+    return {'remove': removed}
 
 
 def render_scene(scene: Dict, number: int, prefix: str, names: Dict, shot_types: List[str]) -> Tuple[Dict, Dict]:
@@ -144,11 +124,8 @@ def main() -> None:
     show_notice()
 
     options = api.options()
-    missing = [(scene['id'], shot['id']) for scene in script['scenes'] for shot in scene['shots'] if not shot.get('path')]
-    settings_col, save_col, missing_col = st.columns([2, 1, 1])
-    settings_col.caption(f"Reference frames: {options['providers'][script['provider']]} · {script['aspect_ratio']} · low detailed view.")
+    _, save_col = st.columns([3, 1])
     save_clicked = save_col.button("Save script", type="primary", width='stretch')
-    missing_clicked = missing_col.button(f"Generate {len(missing)} missing frame(s)", disabled=not missing, width='stretch')
 
     names = asset_names(world)
     shot_types = options.get('shot_types', [])
@@ -162,9 +139,8 @@ def main() -> None:
     new_scene, new_scene_clicked = render_new_scene(len(script['scenes']))
 
     # Act once every widget is drawn, so ``collect`` sees all of them.
-    to_generate = list(missing) if missing_clicked else []
     deleted = None
-    changed = save_clicked or header_clicked or missing_clicked or new_scene_clicked
+    changed = save_clicked or header_clicked or new_scene_clicked
     edited_scenes = []
     for scene_id, prefix, edited, actions in scenes:
         edited = collect(edited, prefix)
@@ -177,11 +153,10 @@ def main() -> None:
             edited['shots'].append({'id': next_shot_id(edited['shots']), 'type': None, 'action': ""})
         if actions['delete']:
             deleted = scene_id
-        to_generate += [(scene_id, shot_id) for shot_id, clicked in actions['shots'].items() if clicked['generate']]
         changed = changed or bool(removed) or actions['add'] or actions['delete']
         edited_scenes.append(edited)
 
-    if not (changed or to_generate):
+    if not changed:
         return
     try:
         api.put(episode_url(world, episode), json={**script, **header, 'scenes': edited_scenes})
@@ -194,8 +169,6 @@ def main() -> None:
     except api.ApiError as exc:
         st.error(str(exc))
         return
-    if to_generate:
-        generate_shots(world, episode, to_generate, "frame")
     notify('success', "Script saved.")
 
 

@@ -5,23 +5,22 @@
 
 Folders decide which episodes and scenes exist; ``script.json`` decides their
 order and content. A scene folder missing from the script is read as an empty
-scene, and a script entry without a folder is dropped. Each shot has one image,
-the file in its scene folder that ``image`` names; regenerating points it at a
-new file and leaves the old one on disk. The episode's ``provider`` and
-``aspect_ratio`` are used for every shot in it.
+scene, and a script entry without a folder is dropped. The episode's
+``aspect_ratio`` is used for every shot in it.
 
-A shot can also have a ``final``: its high-fidelity frame, the finished image
-the storyboard frame plans, saved in the same scene folder as
-``{uuid8}-{shot}-final``. ``final_provider`` is the model the last high-fidelity
+A shot's ``final`` is its high-fidelity frame, saved in its scene folder as
+``{uuid8}-{shot}-final``; regenerating points it at a new file and leaves the
+old one on disk. ``image`` names an older storyboard preview, kept as it is;
+nothing renders one any more. ``final_provider`` is the model the last high-fidelity
 pass of the episode used (OpenAI or Gemini).
 
 A shot's ``type`` is its framing, one of ``SHOT_TYPES`` (or ``null`` when not
-picked); it leads the shot's description in both renders.
+picked); it leads the shot's description (:func:`shot_description`).
 
 script.json::
 
     {
-      "title": "...", "synopsis": "...", "provider": "runware", "aspect_ratio": "landscape", "final_provider": "gemini",
+      "title": "...", "synopsis": "...", "aspect_ratio": "landscape", "final_provider": "gemini",
       "scenes": [{
         "id": "scene1", "heading": "INT. KITCHEN - DAY", "summary": "...",
         "characters": ["fox", "fox:older"], "locations": ["kitchen"], "objects": ["lantern"],
@@ -40,7 +39,7 @@ import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from app.assets.generation import ASPECT_RATIOS, DEFAULT_FINAL_PROVIDER, DEFAULT_SHOT_PROVIDER, FINAL_PROVIDERS, PROVIDERS
+from app.assets.generation import ASPECT_RATIOS, DEFAULT_FINAL_PROVIDER, FINAL_PROVIDERS
 from app.assets.prompt_manager import ASSET_DIRS
 from app.assets.worlds import images_in, legacy_name, move_to_deleted, slugify, subfolders, world_dir, write_json
 from app.settings import relative
@@ -135,7 +134,6 @@ def _normalise(world: str, episode: str, raw: Dict) -> Script:
     return {
         "title": str(raw.get("title") or episode),
         "synopsis": str(raw.get("synopsis", "")),
-        "provider": raw.get("provider") if raw.get("provider") in PROVIDERS else DEFAULT_SHOT_PROVIDER,
         "aspect_ratio": raw.get("aspect_ratio") if raw.get("aspect_ratio") in ASPECT_RATIOS else "landscape",
         "final_provider": raw.get("final_provider") if raw.get("final_provider") in FINAL_PROVIDERS else DEFAULT_FINAL_PROVIDER,
         "scenes": [_clean_scene(by_id.get(scene_id, {}), scene_id, directory / scene_id) for scene_id in order],
@@ -164,7 +162,7 @@ def _save_script(world: str, episode: str, raw: Dict) -> Script:
         for scene in current["scenes"] for shot in scene["shots"]
     }
     raw = {
-        **{key: current[key] for key in ("provider", "aspect_ratio", "final_provider")},
+        **{key: current[key] for key in ("aspect_ratio", "final_provider")},
         **raw,
         "scenes": [
             {**scene, "shots": [
@@ -262,10 +260,13 @@ def rename_references(world: str, folder: str, old: str, new: str) -> None:
             save_script(world, episode, script)
 
 
+def _action(shot: Dict) -> str:
+    return f"{shot['type']}: {shot['action']}" if shot["type"] else shot["action"]
+
+
 def shot_description(scene: Dict, shot: Dict, cast: List[str]) -> str:
-    """What a shot's frame should show, with ``cast`` (one line per character, location or object)."""
-    action = f"{shot['type']}: {shot['action']}" if shot["type"] else shot["action"]
-    lines = [scene["heading"], scene["summary"], action]
+    """What a shot's final frame should show, with ``cast`` (one line per character, location or object)."""
+    lines = [scene["heading"], scene["summary"], _action(shot)]
     if cast:
         lines.append("In this scene:\n" + "\n".join(f"- {line}" for line in cast))
     return "\n".join(line for line in lines if line.strip())

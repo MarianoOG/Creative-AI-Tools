@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.assets import library, story
-from app.assets.generation import FINAL_PROVIDERS, SHOT_QUALITY, generate_image
+from app.assets.generation import FINAL_PROVIDERS, generate_image
 from app.assets.prompt_manager import ASSET_DIRS
 from app.assets.worlds import list_worlds, read_style, read_world
 
@@ -19,9 +19,7 @@ class Name(BaseModel):
     name: str
 
 
-class Fidelity(BaseModel):
-    #: Render the shot's high-fidelity final frame instead of its storyboard frame.
-    final: bool = False
+class FinalFrame(BaseModel):
     #: The final frame's model (``openai`` or ``gemini``); the episode's last one when left out.
     provider: Optional[str] = None
 
@@ -110,12 +108,9 @@ def _cast_line(assets: Dict[str, Dict], reference: str, asset_type: str) -> str:
     return f"{label}: {details}" if details else label
 
 
-def _final_references(world: str, episode: str, scene: Dict, shot: Dict) -> tuple[List, List[str]]:
-    """A final frame's references: the storyboard frame, then each design the scene lists, with one label per image."""
+def _final_references(world: str, scene: Dict) -> tuple[List, List[str]]:
+    """A final frame's references: each design the scene lists, with one label per image."""
     paths, labels = [], []
-    if shot["image"] and (frame := story.scene_dir(world, episode, scene["id"]) / shot["image"]).is_file():
-        paths.append(frame)
-        labels.append("the storyboard frame of this shot")
     for asset_type, folder in ASSET_DIRS.items():
         designs = library.reference_paths(world, asset_type)
         for reference in scene[folder]:
@@ -126,20 +121,15 @@ def _final_references(world: str, episode: str, scene: Dict, shot: Dict) -> tupl
 
 
 @router.post("/{episode}/scenes/{scene}/shots/{shot}/generate")
-def generate_shot(world: str, episode: str, scene: str, shot: str, body: Optional[Fidelity] = None) -> Dict:
-    """Render a shot's storyboard frame or, with ``final``, its high-fidelity final frame, replacing the one it had (whose file stays on disk).
+def generate_shot(world: str, episode: str, scene: str, shot: str, body: Optional[FinalFrame] = None) -> Dict:
+    """Render a shot's high-fidelity final frame, replacing the one it had (whose file stays on disk).
 
-    A storyboard frame uses the episode's provider and aspect ratio and the
-    world's style, always as a low detailed view at low quality and low
-    resolution. No images are sent: the characters, locations and objects the
-    scene lists go in as their descriptions.
-
-    A final frame uses OpenAI or Gemini at high quality and full size, in the
-    episode's aspect ratio. It is sent the storyboard frame and the image of
-    every character, location and object the scene lists, as well as their
-    descriptions.
+    It uses OpenAI or Gemini at high quality and full size, in the episode's
+    aspect ratio and the world's style. It is sent the image of every
+    character, location and object the scene lists, as well as their
+    descriptions and the shot's text.
     """
-    body = body or Fidelity()
+    body = body or FinalFrame()
     _check_world(world)
     script = _call(story.read_script, world, episode)
     scene_data = next((s for s in script["scenes"] if s["id"] == scene), None)
@@ -161,33 +151,28 @@ def generate_shot(world: str, episode: str, scene: str, shot: str, body: Optiona
     style = read_style(world)
     if not style:
         raise HTTPException(422, "This world has no style yet - write one in the sidebar.")
-
-    if not body.final:
-        provider, options = script["provider"], dict(quality=SHOT_QUALITY)
-    else:
-        provider = body.provider or script["final_provider"]
-        if provider not in FINAL_PROVIDERS:
-            raise HTTPException(422, f"a final frame's provider must be one of {list(FINAL_PROVIDERS)}")
-        references, labels = _final_references(world, episode, scene_data, shot_data)
-        if labels:
-            description += "\n\nReference images, in order:\n" + "\n".join(
-                f"{number}. {label}" for number, label in enumerate(labels, start=1)
-            )
-        options = dict(quality="high", references=references, clause="final")
+    provider = body.provider or script["final_provider"]
+    if provider not in FINAL_PROVIDERS:
+        raise HTTPException(422, f"a final frame's provider must be one of {list(FINAL_PROVIDERS)}")
+    references, labels = _final_references(world, scene_data)
+    if labels:
+        description += "\n\nReference images, in order:\n" + "\n".join(
+            f"{number}. {label}" for number, label in enumerate(labels, start=1)
+        )
 
     try:
         path = generate_image(
-            "final" if body.final else "shot",
-            f"{shot}-final" if body.final else shot,
+            "final",
+            f"{shot}-final",
             description,
             style,
             story.scene_dir(world, episode, scene),
             provider=provider,
+            references=references,
+            clause="final",
             aspect_ratio=script["aspect_ratio"],
-            **options,
+            quality="high",
         )
     except Exception as exc:  # any provider failure: the client gets the reason
         raise HTTPException(502, f"{provider}: {exc}") from exc
-    field = "final" if body.final else "image"
-    final_provider = provider if body.final else None
-    return story.with_images(world, episode, story.set_shot_image(world, episode, scene, shot, path, field, final_provider))
+    return story.with_images(world, episode, story.set_shot_image(world, episode, scene, shot, path, "final", provider))
