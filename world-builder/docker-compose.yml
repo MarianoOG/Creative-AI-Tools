@@ -13,9 +13,13 @@ services:
     stop_grace_period: 3m
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      # Probe every second while starting so the frontend starts as soon as
+      # the backend answers, then fall back to a slow probe once it's healthy.
+      start_period: 30s
+      start_interval: 1s
+      interval: 30s
+      timeout: 2s
+      retries: 2
 
   frontend:
     build: ./frontend
