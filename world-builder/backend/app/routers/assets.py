@@ -17,7 +17,9 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from app.assets import library, story
-from app.assets.generation import ASPECT_RATIOS, DEFAULT_PROVIDER, PROVIDERS, generate_image
+from app.assets.generation import (
+    ASPECT_RATIOS, DEFAULT_FINAL_PROVIDER, DEFAULT_PROVIDER, FINAL_PROVIDERS, PROVIDERS, generate_image,
+)
 from app.assets.prompt_manager import ASSET_DIRS, LOCATION_VIEWS, STYLES, build_prompt, variation_description
 from app.assets.worlds import DEFAULT_WORLD, list_worlds, read_style, slugify, world_dir
 
@@ -169,6 +171,8 @@ def options() -> Dict:
         "styles": STYLES,
         "providers": PROVIDERS,
         "default_provider": DEFAULT_PROVIDER,
+        "final_providers": list(FINAL_PROVIDERS),
+        "default_final_provider": DEFAULT_FINAL_PROVIDER,
         "aspect_ratios": list(ASPECT_RATIOS),
         "location_views": list(LOCATION_VIEWS),
         "default_world": DEFAULT_WORLD,

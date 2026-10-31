@@ -10,14 +10,19 @@ the file in its scene folder that ``image`` names; regenerating points it at a
 new file and leaves the old one on disk. The episode's ``provider`` and
 ``aspect_ratio`` are used for every shot in it.
 
+A shot can also have a ``final``: its high-fidelity frame, the finished image
+the storyboard frame plans, saved in the same scene folder as
+``{uuid8}-{shot}-final``. ``final_provider`` is the model the last high-fidelity
+pass of the episode used (OpenAI or Gemini).
+
 script.json::
 
     {
-      "title": "...", "synopsis": "...", "provider": "runware", "aspect_ratio": "landscape",
+      "title": "...", "synopsis": "...", "provider": "runware", "aspect_ratio": "landscape", "final_provider": "gemini",
       "scenes": [{
         "id": "scene1", "heading": "INT. KITCHEN - DAY", "summary": "...",
         "characters": ["fox", "fox:older"], "locations": ["kitchen"], "objects": ["lantern"],
-        "shots": [{"id": "shot_1", "action": "...", "image": "1a2b3c4d-shot_1.png"}]
+        "shots": [{"id": "shot_1", "action": "...", "image": "1a2b3c4d-shot_1.png", "final": "5e6f7a8b-shot_1-final.jpg"}]
       }]
     }
 
@@ -31,7 +36,7 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from app.assets.generation import ASPECT_RATIOS, DEFAULT_SHOT_PROVIDER, PROVIDERS
+from app.assets.generation import ASPECT_RATIOS, DEFAULT_FINAL_PROVIDER, DEFAULT_SHOT_PROVIDER, FINAL_PROVIDERS, PROVIDERS
 from app.assets.prompt_manager import ASSET_DIRS
 from app.assets.worlds import images_in, legacy_name, move_to_deleted, slugify, subfolders, world_dir
 from app.settings import relative
@@ -81,6 +86,7 @@ def _clean_shot(raw: Dict, folder: Path) -> Dict:
         "id": shot_id,
         "action": str(raw.get("action", "")),
         "image": Path(str(image)).name if image else None,
+        "final": Path(str(raw["final"])).name if raw.get("final") else None,
     }
 
 
@@ -114,6 +120,7 @@ def _normalise(world: str, episode: str, raw: Dict) -> Script:
         "synopsis": str(raw.get("synopsis", "")),
         "provider": raw.get("provider") if raw.get("provider") in PROVIDERS else DEFAULT_SHOT_PROVIDER,
         "aspect_ratio": raw.get("aspect_ratio") if raw.get("aspect_ratio") in ASPECT_RATIOS else "landscape",
+        "final_provider": raw.get("final_provider") if raw.get("final_provider") in FINAL_PROVIDERS else DEFAULT_FINAL_PROVIDER,
         "scenes": [_clean_scene(by_id.get(scene_id, {}), scene_id, directory / scene_id) for scene_id in order],
     }
 
@@ -130,13 +137,16 @@ def read_script(world: str, episode: str) -> Script:
 def save_script(world: str, episode: str, raw: Dict) -> Script:
     """Save a script. A shot or setting the client left out keeps what is on disk, so a page that only edits text never drops an image."""
     current = read_script(world, episode)
-    images = {(scene["id"], shot["id"]): shot["image"] for scene in current["scenes"] for shot in scene["shots"]}
+    frames = {
+        (scene["id"], shot["id"]): {"image": shot["image"], "final": shot["final"]}
+        for scene in current["scenes"] for shot in scene["shots"]
+    }
     raw = {
-        **{key: current[key] for key in ("provider", "aspect_ratio")},
+        **{key: current[key] for key in ("provider", "aspect_ratio", "final_provider")},
         **raw,
         "scenes": [
             {**scene, "shots": [
-                {"image": images.get((scene.get("id"), slugify(str(shot.get("id", ""))))), **shot}
+                {**frames.get((scene.get("id"), slugify(str(shot.get("id", "")))), {}), **shot}
                 for shot in scene.get("shots", [])
             ]}
             for scene in raw.get("scenes", current["scenes"])
@@ -148,22 +158,23 @@ def save_script(world: str, episode: str, raw: Dict) -> Script:
 
 
 def with_images(world: str, episode: str, script: Script) -> Script:
-    """Give each shot the data-relative ``path`` of its image, or ``None`` if it has none (or the file is gone)."""
+    """Give each shot the data-relative ``path`` of its image and ``final_path`` of its final, ``None`` if missing."""
     for scene in script["scenes"]:
         folder = scene_dir(world, episode, scene["id"])
         for shot in scene["shots"]:
-            path = folder / shot["image"] if shot["image"] else None
-            shot["path"] = relative(path) if path and path.is_file() else None
+            for field, key in (("image", "path"), ("final", "final_path")):
+                path = folder / shot[field] if shot[field] else None
+                shot[key] = relative(path) if path and path.is_file() else None
     return script
 
 
-def set_shot_image(world: str, episode: str, scene: str, shot: str, image: Path) -> Script:
-    """Point a shot at a new image. The previous file stays in the scene folder."""
+def set_shot_image(world: str, episode: str, scene: str, shot: str, image: Path, field: str = "image") -> Script:
+    """Point a shot's ``image`` (or ``final``) at a new file. The previous file stays in the scene folder."""
     script = read_script(world, episode)
     for scene_data in script["scenes"]:
         for shot_data in scene_data["shots"]:
             if scene_data["id"] == scene and shot_data["id"] == shot:
-                shot_data["image"] = image.name
+                shot_data[field] = image.name
     return save_script(world, episode, script)
 
 

@@ -8,7 +8,8 @@ Gemini (Nano Banana 2), always in the world's style:
 | `character` | Turnaround sheet: front, three-quarter, back on white | inspiration (uploads) |
 | `object` | Turnaround sheet: front isometric and side views on white | inspiration (uploads) |
 | `location` | Empty background plate, no figures, in three views | inspiration (uploads) |
-| `shot` | Storyboard frame | designs to reproduce faithfully (the scene's assets) |
+| `shot` | Storyboard frame | none: text only |
+| `final` | A shot's high-fidelity frame | the storyboard frame as the plan, the scene's assets as designs to reproduce faithfully |
 
 An asset is created as just a name and a description, with no images. Its
 images are **variations**, each with a name, and one is **preferred** (the
@@ -106,6 +107,7 @@ scene entry without a folder is dropped on the next save.
   "synopsis": "A fox arrives at a night market...",
   "provider": "openai",
   "aspect_ratio": "landscape",
+  "final_provider": "gemini",
   "scenes": [{
     "id": "scene1",
     "heading": "EXT. NIGHT MARKET - NIGHT",
@@ -114,7 +116,8 @@ scene entry without a folder is dropped on the next save.
     "shots": [{
       "id": "market_night",
       "action": "The fox walks down the wet street, lantern raised.",
-      "image": "9c0d1e2f-market_night.png"
+      "image": "9c0d1e2f-market_night.png",
+      "final": "3a4b5c6d-market_night-final.jpg"
     }]
   }]
 }
@@ -123,7 +126,9 @@ scene entry without a folder is dropped on the next save.
 `characters`, `locations` and `objects` hold references: `name` for an asset's
 preferred image, `name:variation` for a specific one (`fox_hero:older`,
 `night_market:reverse`). A shot's `image` is its one frame in the scene folder;
-scripts from before it get the newest file named after the shot.
+scripts from before it get the newest file named after the shot. Its `final` is
+its high-fidelity frame, in the same folder; `final_provider` is the model the
+episode's last one used.
 
 ## Generating
 
@@ -149,3 +154,10 @@ wait for the render and return the result. Each image is rendered by one
   quality and a lower resolution (`SHOT_SIZES` in `generation.py`). The model
   and aspect ratio (`landscape`, `square`, `portrait`) are the episode's.
   Regenerating points the shot at the new image.
+- **final frames**: the same endpoint with `{"final": true, "provider": "openai" | "gemini"}`
+  renders the shot's finished, fully detailed frame instead, at high quality and
+  2K in the episode's aspect ratio. It is sent the storyboard frame (to keep its
+  composition, camera and lighting) and the image of every character, location
+  and object the scene lists (as designs to reproduce), plus their
+  descriptions. Regenerating points `final` at the new image; the storyboard
+  frame is untouched.

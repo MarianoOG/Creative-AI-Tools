@@ -35,6 +35,9 @@ PROVIDERS = {
 DEFAULT_PROVIDER = "openai"
 #: A new episode's storyboard model: cheaper and faster than the asset default.
 DEFAULT_SHOT_PROVIDER = "runware"
+#: The models a high-fidelity final frame can use, and the default one.
+FINAL_PROVIDERS = ("openai", "gemini")
+DEFAULT_FINAL_PROVIDER = "gemini"
 
 #: Friendly name -> the ratio Gemini takes.
 ASPECT_RATIOS = {"landscape": "16:9", "square": "1:1", "portrait": "9:16"}
@@ -42,8 +45,8 @@ ASPECT_RATIOS = {"landscape": "16:9", "square": "1:1", "portrait": "9:16"}
 #: Ratio -> the 2K pixel size gpt-image-2 takes (both sides divisible by 16).
 OPENAI_SIZES = {"16:9": "2048x1152", "1:1": "2048x2048", "9:16": "1152x2048"}
 
-#: Provider -> the most reference images it takes; the others take any number.
-MAX_REFERENCES = {"runware": 4}
+#: Provider -> the most reference images it takes (the API limits).
+MAX_REFERENCES = {"runware": 4, "openai": 16, "gemini": 14}
 
 #: Ratio -> the (width, height) Runware renders.
 RUNWARE_SIZES = {"16:9": (1280, 720), "1:1": (1024, 1024), "9:16": (720, 1280)}
@@ -66,7 +69,8 @@ QUALITY: dict[str, tuple[str, Optional[str]]] = {
 }
 
 #: Characters, objects and locations are always rendered like this; shots take
-#: their ratio from the episode and are always low quality (storyboard drafts).
+#: their ratio from the episode and are always low quality (storyboard drafts);
+#: final frames take it too, at high quality and full size.
 ASSET_ASPECT_RATIO = "landscape"
 ASSET_QUALITY = "high"
 SHOT_QUALITY = "low"

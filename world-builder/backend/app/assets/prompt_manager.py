@@ -5,7 +5,8 @@ Framing comes after the style, so it has the last word on layout and lighting.
 The style clause is the world's style (in ``world.json``); :data:`STYLES` are the presets
 new worlds start from. Storyboard shots use it too, as a quick low detailed
 view drawn from text alone (no reference images) that is about composition and
-lighting.
+lighting; a shot's final frame is the finished version, drawn from the
+storyboard frame and the scene's designs.
 """
 
 from __future__ import annotations
@@ -180,6 +181,19 @@ _SHOT_TAIL = (
     "No text, no captions, no speech bubbles, no borders."
 )
 
+_FINAL_COMPOSITION = (
+    "Render this as a finished, high-fidelity frame of the story: a single "
+    "film frame depicting the situation described above, fully rendered in the "
+    "style above with complete detail, texture and finish. Compose it like a "
+    "film frame, with layered depth and a clear focal point. Every character "
+    "and object mentioned has a readable place in the frame and keeps its "
+    "design exactly, so it is easy to tell who and what is in it. "
+)
+_FINAL_LIGHTING = (
+    "Light it cinematically, with light and shadow leading the eye to the "
+    "focal subject. "
+)
+
 #: For line-only styles, where a lighting or colour-grade sentence would contradict the style.
 _MONOCHROME_RENDERING = (
     "Describe the whole frame with black contour lines alone: depth and "
@@ -197,12 +211,14 @@ FRAMING: dict[str, str] = {
     "object": OBJECT_FRAMING,
     "location": _LOCATION_COMPOSITION + "{view}" + _LOCATION_LIGHTING + _LOCATION_TAIL,
     "shot": _SHOT_COMPOSITION + _SHOT_LIGHTING + _SHOT_TAIL,
+    "final": _FINAL_COMPOSITION + _FINAL_LIGHTING + _SHOT_TAIL,
 }
 
 #: Framings for line-only styles. Matched on the exact preset text, so an edited style gets the default framing.
 MONOCHROME_FRAMING: dict[str, str] = {
     "location": _LOCATION_COMPOSITION + "{view}" + _MONOCHROME_RENDERING + _LOCATION_TAIL,
     "shot": _SHOT_COMPOSITION + _MONOCHROME_RENDERING + _SHOT_TAIL,
+    "final": _FINAL_COMPOSITION + _MONOCHROME_RENDERING + _SHOT_TAIL,
 }
 _MONOCHROME_STYLES = {STYLES["ligne_claire_lineart"]}
 
@@ -263,6 +279,19 @@ REFERENCE_CLAUSES: dict[str, str] = {
         "camera position described here. Do not invent a different or neighbouring "
         "place, and keep it empty of figures."
     ),
+    "final": (
+        "The reference images are listed above in the order they are attached. "
+        "The storyboard frame, when there is one, is the plan for this frame: "
+        "keep its composition, camera angle, shot size, staging and lighting, "
+        "but not its rough, simplified rendering. The other references are the "
+        "established designs of the characters, locations and objects in the "
+        "scene, and they are fact, not inspiration: reproduce their identity, "
+        "proportions, costume, materials and colour palette exactly. Character "
+        "and object references are turnaround sheets on white: draw each subject "
+        "once, inside the scene, never as a sheet of views. Location references "
+        "are empty background plates of the place where the frame happens. The "
+        "style is defined by the style description above."
+    ),
 }
 
 
@@ -278,7 +307,7 @@ def build_prompt(
     clause: str | None = None,
     view: str = "establishing",
 ) -> str:
-    """Compose the full prompt for one image. For a shot, ``description`` is the situation to depict.
+    """Compose the full prompt for one image. For a shot or a final frame, ``description`` is the situation to depict.
 
     ``clause`` names the :data:`REFERENCE_CLAUSES` entry for the attached
     references (``None`` when there are none). ``view`` is the camera of a location.
