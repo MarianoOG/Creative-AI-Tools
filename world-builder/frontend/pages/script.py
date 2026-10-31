@@ -17,27 +17,19 @@ import streamlit as st
 
 import api
 from shared.state import notify, show_notice
-from shared.story import asset_names, episode_url, pick_episode, references_markdown, scene_fields
+from shared.story import asset_names, episode_url, pick_episode, scene_fields
 from shared.worlds import render_world_switcher
 
 
-def render_header(episode: str, script: Dict) -> Tuple[Dict, bool]:
-    """The episode's title, synopsis and aspect ratio. Returns them as typed, and whether Save was clicked."""
-    options = api.options()
-    with st.expander("Edit title, synopsis and aspect ratio"):
-        title = st.text_input("Title", value=script['title'], key=f"title_{episode}")
-        synopsis = st.text_area("Synopsis", value=script['synopsis'], key=f"synopsis_{episode}")
-        ratios = options['aspect_ratios']
-        aspect_ratio = st.selectbox(
-            "Aspect ratio", ratios, index=ratios.index(script['aspect_ratio']), key=f"ratio_{episode}"
-        )
-        st.caption("Every frame of the episode uses this aspect ratio.")
-        clicked = st.button("Save", key=f"save_header_{episode}")
-    st.title(script['title'])
-    if script['synopsis']:
-        st.write(f"*{script['synopsis']}*")
-    fields = {'title': title, 'synopsis': synopsis, 'aspect_ratio': aspect_ratio}
-    return fields, clicked
+def render_header(episode: str, script: Dict, ratios: List[str]) -> Dict:
+    """The episode's title, synopsis and aspect ratio as fields. Returns them as typed."""
+    title = st.text_input("Title", value=script['title'], key=f"title_{episode}")
+    synopsis = st.text_area("Synopsis", value=script['synopsis'], height=90, key=f"synopsis_{episode}")
+    aspect_ratio = st.selectbox(
+        "Aspect ratio", ratios, index=ratios.index(script['aspect_ratio']), key=f"ratio_{episode}",
+        help="Every frame of the episode uses this aspect ratio.",
+    )
+    return {'title': title, 'synopsis': synopsis, 'aspect_ratio': aspect_ratio}
 
 
 def shot_key(prefix: str, shot: Dict, field: str) -> str:
@@ -76,19 +68,15 @@ def render_shot(shot: Dict, prefix: str, number: int, shot_types: List[str]) -> 
 
 
 def render_scene(scene: Dict, number: int, prefix: str, names: Dict, shot_types: List[str]) -> Tuple[Dict, Dict]:
-    """A scene's heading, summary, references and shots. Returns the scene's fields as typed, and what was clicked."""
-    st.subheader(f"{number}. {scene['heading'] or scene['id']}")
-    edit_col, delete_col = st.columns([4, 1])
-    with edit_col.expander("Edit heading, summary and references"):
-        edited = scene_fields(scene, names, prefix)
+    """A scene's heading, summary, references and shots, all as fields. Returns the scene as typed, and what was clicked."""
+    title_col, delete_col = st.columns([4, 1], vertical_alignment='center')
+    title_col.subheader(f"Scene {number} · `{scene['id']}`")
     with delete_col.popover("Delete", width='stretch'):
         st.warning(f"All {len(scene['shots'])} shots of **{scene['id']}** will be removed from the script (the folder is kept, hidden).")
         delete_clicked = st.button("Delete scene", icon=":material/delete:", key=f"{prefix}delete")
-    if scene['summary']:
-        st.write(scene['summary'])
-    if references_markdown(scene):
-        st.caption(references_markdown(scene))
+    edited = scene_fields(scene, names, prefix)
 
+    st.markdown("**Shots**")
     shots = {
         shot['id']: render_shot(shot, prefix, shot_number, shot_types)
         for shot_number, shot in enumerate(scene['shots'], start=1)
@@ -120,12 +108,11 @@ def main() -> None:
     if not episode:
         return
     script = api.get(episode_url(world, episode))
-    header, header_clicked = render_header(episode, script)
-    show_notice()
-
     options = api.options()
+    show_notice()
     _, save_col = st.columns([3, 1])
     save_clicked = save_col.button("Save script", type="primary", width='stretch')
+    header = render_header(episode, script, options['aspect_ratios'])
 
     names = asset_names(world)
     shot_types = options.get('shot_types', [])
@@ -140,7 +127,7 @@ def main() -> None:
 
     # Act once every widget is drawn, so ``collect`` sees all of them.
     deleted = None
-    changed = save_clicked or header_clicked or new_scene_clicked
+    changed = save_clicked or new_scene_clicked
     edited_scenes = []
     for scene_id, prefix, edited, actions in scenes:
         edited = collect(edited, prefix)

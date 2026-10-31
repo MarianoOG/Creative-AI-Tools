@@ -90,19 +90,11 @@ def scene_fields(scene: Dict, names: Dict[str, List[str]], prefix: str) -> Dict:
     heading = st.text_input("Heading", value=scene['heading'], placeholder="INT. KITCHEN - DAY", key=f"{prefix}heading")
     summary = st.text_area("What happens", value=scene['summary'], height=90, key=f"{prefix}summary")
     picks = {}
-    for column, field in zip(st.columns(len(REFERENCE_FIELDS)), REFERENCE_FIELDS):
-        # Keep names whose asset is gone, so opening the editor never drops them.
+    for field in REFERENCE_FIELDS:
+        # Keep names whose asset is gone, so saving never drops them.
         options = names[field] + [name for name in scene[field] if name not in names[field]]
-        picks[field] = column.multiselect(
+        picks[field] = st.multiselect(
             field.capitalize(), options, default=scene[field], format_func=reference_label, key=f"{prefix}{field}"
         )
     return {**scene, 'heading': heading, 'summary': summary, **picks}
 
-
-def references_markdown(scene: Dict) -> str:
-    parts = [
-        f"**{field.capitalize()}:** " + ", ".join(f"`{reference_label(name)}`" for name in scene[field])
-        for field in REFERENCE_FIELDS
-        if scene[field]
-    ]
-    return "  \n".join(parts)

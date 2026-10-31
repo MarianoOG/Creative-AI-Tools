@@ -32,7 +32,7 @@ PROVIDERS = {
 }
 DEFAULT_PROVIDER = "openai"
 #: The models a high-fidelity final frame can use, and the default one.
-FINAL_PROVIDERS = ("openai", "gemini")
+FINAL_PROVIDERS = ("openai", "gemini", "runware")
 DEFAULT_FINAL_PROVIDER = "gemini"
 
 #: Friendly name -> the ratio Gemini takes.

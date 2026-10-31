@@ -216,9 +216,10 @@ def _new_dir(parent: Path, name: str, what: str) -> Path:
     return directory
 
 
-def create_episode(world: str, name: str) -> str:
-    directory = _new_dir(episodes_dir(world), name, "episode")
-    save_script(world, directory.name, {"title": name.strip()})
+def create_episode(world: str, title: str, synopsis: str = "", aspect_ratio: str = "landscape") -> str:
+    """A new, empty episode named after its title."""
+    directory = _new_dir(episodes_dir(world), title, "episode")
+    save_script(world, directory.name, {"title": title.strip(), "synopsis": synopsis.strip(), "aspect_ratio": aspect_ratio})
     return directory.name
 
 

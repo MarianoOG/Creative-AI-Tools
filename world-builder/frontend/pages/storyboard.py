@@ -1,6 +1,6 @@
 """Storyboard: an episode's high-fidelity final frames in a grid, their generation, and a zip of them all.
 
-A final frame is the finished image of a shot, rendered once by OpenAI or Gemini at high quality from
+A final frame is the finished image of a shot, rendered once by OpenAI, Gemini or Runware (Flux 2 Klein) at high quality from
 the shot's text and the designs of everything the scene lists, in the world's
 style. Any one, or once all exist every one, can be
 regenerated; the old file stays on disk.

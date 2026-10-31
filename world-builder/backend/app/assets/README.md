@@ -1,7 +1,7 @@
 # Worlds, assets and stories
 
 Four kinds of image, each rendered by one provider, OpenAI (`gpt-image-2`),
-Gemini (Nano Banana 2) or Runware (Flux 2 Klein, assets only), always in the world's style:
+Gemini (Nano Banana 2) or Runware (Flux 2 Klein), always in the world's style:
 
 | Type | What it renders | References are treated as |
 | --- | --- | --- |
@@ -146,7 +146,7 @@ wait for the render and return the result. Each image is rendered by one
 - **assets**: always landscape (16:9) and high quality. Several renders (a
   location's views, regenerate all) run one after another; if one fails, the
   ones already made are kept and the failure comes back as a `warning`.
-- **final frames**: the shot endpoint, with `{"provider": "openai" | "gemini"}`
+- **final frames**: the shot endpoint, with `{"provider": "openai" | "gemini" | "runware"}`
   (the episode's last one when left out), renders the shot's finished, fully
   detailed frame at high quality and 2K in the episode's aspect ratio. It is sent the image of every character,
   location and object the scene lists (as designs to reproduce, which with the

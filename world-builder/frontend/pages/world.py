@@ -99,20 +99,31 @@ def render_assets(world: str, asset_type: str) -> None:
                 render_tile(world, asset)
 
 
-def render_episodes(world: str) -> None:
-    episodes = api.get(f"/worlds/{world}/episodes")['episodes']
-    suggested = f"episode{len(episodes) + 1}"
-    name_col, button_col = st.columns([3, 1])
-    name = name_col.text_input("New episode", placeholder=suggested, label_visibility='collapsed')
-    if button_col.button("Create episode", icon=":material/add:", type="primary", width='stretch'):
-        stay_on("Episodes")
-        try:
-            created = api.post(f"/worlds/{world}/episodes", json={'name': name or suggested})['name']
-        except api.ApiError as exc:
-            st.error(str(exc))
-            return
-        notify('success', f"Created episode **{created}**.")
+def render_new_episode(world: str) -> None:
+    """Create an episode (title, synopsis and aspect ratio) and open it on the Script page to write its scenes."""
+    with st.popover("New episode", icon=":material/add:", type="primary"):
+        title = st.text_input("Title", key="new_episode_title",
+                              help="Also names the episode's folder. Spaces and punctuation become underscores.")
+        synopsis = st.text_area("Synopsis", key="new_episode_synopsis", height=120)
+        ratios = api.options()['aspect_ratios']
+        aspect_ratio = st.selectbox("Aspect ratio", ratios, key="new_episode_ratio",
+                                    help="Every frame of the episode uses this aspect ratio.")
+        if st.button("Create", disabled=not title.strip(), key="new_episode_go"):
+            stay_on("Episodes")
+            try:
+                created = api.post(f"/worlds/{world}/episodes", json={
+                    'title': title, 'synopsis': synopsis, 'aspect_ratio': aspect_ratio,
+                })['name']
+            except api.ApiError as exc:
+                st.error(str(exc))
+                return
+            st.session_state.current_episode = created
+            st.switch_page("pages/script.py")
 
+
+def render_episodes(world: str) -> None:
+    render_new_episode(world)
+    episodes = api.get(f"/worlds/{world}/episodes")['episodes']
     if not episodes:
         st.info(f"No episodes in {world} yet.")
     for episode in episodes:

@@ -19,8 +19,14 @@ class Name(BaseModel):
     name: str
 
 
+class NewEpisode(BaseModel):
+    title: str
+    synopsis: str = ""
+    aspect_ratio: str = "landscape"
+
+
 class FinalFrame(BaseModel):
-    #: The final frame's model (``openai`` or ``gemini``); the episode's last one when left out.
+    #: The final frame's model (``openai``, ``gemini`` or ``runware``); the episode's last one when left out.
     provider: Optional[str] = None
 
 
@@ -54,9 +60,12 @@ def get_episodes(world: str) -> Dict:
 
 
 @router.post("", status_code=201)
-def post_episode(world: str, body: Name) -> Dict:
+def post_episode(world: str, body: NewEpisode) -> Dict:
+    """A new episode: a title, a synopsis and an aspect ratio, with no scenes yet. Its name comes from the title."""
     _check_world(world)
-    return {"name": _call(story.create_episode, world, body.name)}
+    if not body.title.strip():
+        raise HTTPException(422, "Give the episode a title.")
+    return {"name": _call(story.create_episode, world, body.title, body.synopsis, body.aspect_ratio)}
 
 
 @router.delete("/{episode}", status_code=204)
@@ -124,7 +133,7 @@ def _final_references(world: str, scene: Dict) -> tuple[List, List[str]]:
 def generate_shot(world: str, episode: str, scene: str, shot: str, body: Optional[FinalFrame] = None) -> Dict:
     """Render a shot's high-fidelity final frame, replacing the one it had (whose file stays on disk).
 
-    It uses OpenAI or Gemini at high quality and full size, in the episode's
+    It uses OpenAI, Gemini or Runware (Flux 2 Klein) at high quality and full size, in the episode's
     aspect ratio and the world's style. It is sent the image of every
     character, location and object the scene lists, as well as their
     descriptions and the shot's text.
