@@ -35,20 +35,25 @@ def money(usd: float) -> str:
     return f"\\${usd:.2f}"
 
 
-def render_settings(world: str, episode: str, scene: Dict, shot: Dict, video: Dict) -> None:
-    """The shot's camera move and clip length, saved as soon as either changes."""
-    camera_col, length_col = st.columns([3, 2])
+def render_controls(world: str, episode: str, scene: Dict, shot: Dict, video: Dict) -> bool:
+    """One line: the camera move and clip length (saved as soon as either changes) and the priced
+    Generate or Regenerate button. Returns whether the button was clicked."""
+    camera_col, length_col, button_col = st.columns([3, 2, 4], vertical_alignment='center')
     prefix = f"video_{world}_{episode}_{scene['id']}_{shot['id']}_{st.session_state.script_revision}_"
     camera_col.selectbox(
         "Camera", video['camera_moves'], index=video['camera_moves'].index(shot['camera']),
-        key=f"{prefix}camera", on_change=save_shot_setting,
+        label_visibility='collapsed', help="Camera move", key=f"{prefix}camera", on_change=save_shot_setting,
         args=(world, episode, scene['id'], shot['id'], 'camera', f"{prefix}camera", True),
     )
     length_col.selectbox(
         "Length", video['durations'], index=video['durations'].index(shot['duration']),
-        format_func=lambda seconds: f"{seconds} s", key=f"{prefix}duration", on_change=save_shot_setting,
+        format_func=lambda seconds: f"{seconds} s", label_visibility='collapsed', help="Clip length",
+        key=f"{prefix}duration", on_change=save_shot_setting,
         args=(world, episode, scene['id'], shot['id'], 'duration', f"{prefix}duration", True),
     )
+    label = "Regenerate" if shot.get('video_path') else "Generate"
+    return button_col.button(f"{label} · {money(clip_price(video, shot))}", key=f"video_{scene['id']}_{shot['id']}",
+                             width='stretch')
 
 
 def is_stale(shot: Dict) -> bool:
@@ -66,8 +71,9 @@ def shot_caption(shot: Dict) -> str:
 
 
 def render_shot(world: str, episode: str, scene: Dict, shot: Dict, video: Dict) -> bool:
-    """One shot as a row: its frame on the left, its video on the right with the video settings and a
-    priced button. Says when the video is missing or older than the frame. Returns whether the button was clicked."""
+    """One shot as a row: its frame on the left, its video on the right, then one line beneath each,
+    side by side: under the frame, a warning when the video is older than it; under the video, the camera,
+    length and priced button. Returns whether the button was clicked."""
     st.markdown(shot_caption(shot))
     frame_col, video_col = st.columns(2)
     if not shot.get('final_path'):
@@ -75,18 +81,16 @@ def render_shot(world: str, episode: str, scene: Dict, shot: Dict, video: Dict) 
         video_col.caption("A video needs the frame first.")
         return False
     frame_col.image(str(api.file_path(shot['final_path'])), width='stretch')
-    with video_col:
-        if shot.get('video_path'):
-            st.video(str(api.file_path(shot['video_path'])))
-            if is_stale(shot):
-                st.warning("The frame was regenerated after this video. Regenerate it to match.",
-                           icon=":material/sync_problem:")
-        else:
-            st.info("No video yet.", icon=":material/pending:")
-        render_settings(world, episode, scene, shot, video)
-        label = "Regenerate video" if shot.get('video_path') else "Generate video"
-        return st.button(f"{label} · {money(clip_price(video, shot))}", key=f"video_{scene['id']}_{shot['id']}",
-                         width='stretch')
+    if shot.get('video_path'):
+        video_col.video(str(api.file_path(shot['video_path'])))
+    else:
+        video_col.info("No video yet.", icon=":material/pending:")
+
+    warning_col, controls_col = st.columns(2, vertical_alignment='center')
+    if is_stale(shot):
+        warning_col.warning("Frame changed after this video. Regenerate to match.", icon=":material/sync_problem:")
+    with controls_col:
+        return render_controls(world, episode, scene, shot, video)
 
 
 def render_grid(world: str, episode: str, script: Dict, video: Dict) -> List[Tuple[str, str]]:
