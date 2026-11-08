@@ -1,4 +1,4 @@
-"""Worlds: create, rename, restyle and delete worlds. Switching happens in the sidebar."""
+"""Worlds: create, rename, restyle, describe and delete worlds. Switching happens in the sidebar."""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ def render_create() -> None:
 
 
 def render_world_row(entry: Dict, active: bool) -> None:
-    """One world: its size, its name and style behind one save, and a delete behind a confirmation."""
+    """One world: its size, its name, style and context behind one save, and a delete behind a confirmation."""
     world, count = entry['name'], entry['asset_count']
     st.markdown(f"### {world}" + ("  ·  *active*" if active else ""))
     st.caption(f"{plural(count, 'asset')} · {plural(entry['episode_count'], 'episode')}")
@@ -37,6 +37,7 @@ def render_world_row(entry: Dict, active: bool) -> None:
     edit_col, delete_col = st.columns(2)
     with edit_col:
         style = api.get(f"/worlds/{world}/style")['style']
+        context = api.get(f"/worlds/{world}/context")['context']
         new_name = st.text_input("Name", value=world, key=f"rename_{world}")
         new_style = st.text_area(
             "Style",
@@ -47,11 +48,20 @@ def render_world_row(entry: Dict, active: bool) -> None:
         )
         if not style:
             st.caption("No style yet: generation is disabled until you write one.")
-        changed = new_name.strip() != world or new_style.strip() != style
+        new_context = st.text_area(
+            "Context",
+            value=context,
+            height=220,
+            key=f"context_{world}",
+            help="Notes about this world: premise, cast, personalities, tone. For reference only; it is not sent to the image models.",
+        )
+        changed = new_name.strip() != world or new_style.strip() != style or new_context.strip() != context
         if st.button("Save world", type="primary", key=f"save_world_{world}", disabled=not changed):
             with show_errors():
                 if new_style.strip() != style:
                     api.put(f"/worlds/{world}/style", json={'style': new_style})
+                if new_context.strip() != context:
+                    api.put(f"/worlds/{world}/context", json={'context': new_context})
                 renamed = api.patch(f"/worlds/{world}", json={'name': new_name})['name']
                 if active:
                     st.session_state.current_world = renamed
@@ -73,7 +83,7 @@ def main() -> None:
 
     st.title("Worlds")
     st.caption(
-        "A world has one style and owns its characters, "
+        "A world has one style, an optional context and owns its characters, "
         "locations, objects and episodes."
     )
     show_notice()
