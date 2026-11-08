@@ -1,7 +1,7 @@
 # World Builder
 
 Build **worlds** with OpenAI, Gemini or Runware (Flux 2 Klein 4B, cheap and fast). Each world has a `world.json` holding
-its visual style and its **characters**, **locations** and **objects** (with
+its visual style, its **context** (free notes on the premise, cast and tone, never sent to a render) and its **characters**, **locations** and **objects** (with
 their variations), and its **episodes**: scenes made of storyboard shots,
 written in a `script.json`.
 
@@ -24,7 +24,7 @@ works is in `backend/app/assets/README.md`.
 | Script | The whole episode, scene by scene and shot by shot, editable in place: each scene's heading, summary and references, and each shot's type (wide, medium, close-up, panorama, ...), action, and its video's camera move (static, pan, tilt, push in, pull out, tracking) and clip length, as text only (nothing is generated here). Add and delete scenes and shots (shots are numbered `shot1`, `shot2`... by their place in the scene, never named), and set the episode's aspect ratio. The episode picker and Save script are in the sidebar. Any button saves everything typed on the page. |
 | Storyboard | An episode's final frames in a grid, each with a Regenerate button. Generate the missing ones in one click (OpenAI, Gemini or Runware Flux 2 Klein, your pick, drawn from the shot's text and the scene's designs in the world's style), then download them all as a zip. Once all exist, the small refresh icon beside Export regenerates every one (after a confirm). |
 | Video | Each shot's final frame animated into a clip with Runware's MiniMax H3 Fast at 768p (no dialogue or voices), prompted with the world's style, the frame, the shot's text (scene heading, summary and cast, and the shot's type and action) and its camera move. Each shot has its own camera move (Static by default) and clip length (5 to 15 s, 5 by default), set beside its clip or on the Script page and saved with the shot. The price of each clip ($0.08/s list price) shows on every button; generate one, the missing ones, or all again, and download them as a zip. A shot needs its final frame first. |
-| Manage worlds | Create (from a style preset) and delete worlds, and edit each one's name and style behind one Save world button. |
+| Manage worlds | Create (from a style preset) and delete worlds, and edit each one's name, style and context behind one Save world button. |
 
 The sidebar holds the world picker.
 Nothing in the app removes a file. Deleting an asset or a variation only drops
