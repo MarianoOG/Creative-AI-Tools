@@ -162,6 +162,7 @@ def generate_shot(world: str, episode: str, scene: str, shot: str, body: Optiona
 
     with provider_errors(provider):
         path = generate_image(
+            world,
             "final",
             f"{shot}-final",
             description,

@@ -7,6 +7,7 @@ from typing import Dict
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from app.assets import costs
 from app.assets.library import list_assets
 from app.assets.story import list_episodes
 from app.assets.worlds import create_world, delete_world, list_worlds, read_style, rename_world, write_style
@@ -61,3 +62,11 @@ def put_style(world: str, body: Style) -> Dict:
     check_world(world)
     call(write_style, world, body.style)
     return {"style": read_style(world)}
+
+
+@router.get("/{world}/costs")
+def get_costs(world: str) -> Dict:
+    """What every render in this world has billed so far: the running total and each entry, newest first."""
+    check_world(world)
+    entries = list(reversed(costs.read_log(world)))
+    return {"total": round(sum(e["usd"] for e in entries), 2), "entries": entries}

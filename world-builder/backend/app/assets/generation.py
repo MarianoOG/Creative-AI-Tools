@@ -18,17 +18,19 @@ from typing import Any, Optional, Sequence
 
 from PIL import Image
 
+from app.assets import costs
 from app.assets.prompt_manager import build_prompt
 
 OPENAI_MODEL = "gpt-image-2"
 GEMINI_MODEL = "gemini-nano-banana-2.1"
 RUNWARE_MODEL = "runware:400@4"
 RUNWARE_URL = "https://api.runware.ai/v1"
-#: Provider -> the name the forms show.
+#: Provider -> the name the forms show. The price hints are rough (landscape, 2K, high quality - what
+#: character, object and location renders always use); the exact figure is logged after each render.
 PROVIDERS = {
-    "openai": f"OpenAI {OPENAI_MODEL}",
-    "gemini": "Gemini Nano Banana 2",
-    "runware": "Runware Flux 2 Klein 4B",
+    "openai": f"OpenAI {OPENAI_MODEL} (billed per token, varies)",
+    "gemini": "Gemini Nano Banana 2 (~$0.05/image)",
+    "runware": "Runware Flux 2 Klein 4B (~$0.015/image)",
 }
 DEFAULT_PROVIDER = "openai"
 #: The models a final frame can use (all of them), and the default one.
@@ -76,7 +78,7 @@ def _base64(path: Path) -> str:
     return base64.b64encode(path.read_bytes()).decode()
 
 
-def _openai_bytes(prompt: str, size: str, quality: str, references: list[Path]) -> bytes:
+def _openai_bytes(prompt: str, size: str, quality: str, references: list[Path]) -> tuple[bytes, Any]:
     from openai import OpenAI
 
     client = OpenAI(api_key=_api_key("OPENAI_API_KEY"))
@@ -93,10 +95,12 @@ def _openai_bytes(prompt: str, size: str, quality: str, references: list[Path]) 
 
     if not result.data or not result.data[0].b64_json:
         raise RuntimeError("OpenAI returned no image data")
-    return base64.b64decode(result.data[0].b64_json)
+    return base64.b64decode(result.data[0].b64_json), result.usage
 
 
-def _gemini_bytes(prompt: str, ratio: str, image_size: str, thinking_level: Optional[str], references: list[Path]) -> bytes:
+def _gemini_bytes(
+    prompt: str, ratio: str, image_size: str, thinking_level: Optional[str], references: list[Path]
+) -> tuple[bytes, Any]:
     from google import genai
 
     client = genai.Client(api_key=_api_key("GEMINI_API_KEY"))
@@ -125,10 +129,10 @@ def _gemini_bytes(prompt: str, ratio: str, image_size: str, thinking_level: Opti
     output = getattr(interaction, "output_image", None)
     if output is None or not output.data:
         raise RuntimeError(f"Gemini returned no image data (status={getattr(interaction, 'status', None)})")
-    return base64.b64decode(output.data)
+    return base64.b64decode(output.data), interaction.usage
 
 
-def _runware_bytes(prompt: str, size: tuple[int, int], references: list[Path]) -> bytes:
+def _runware_bytes(prompt: str, size: tuple[int, int], references: list[Path]) -> tuple[bytes, Optional[float]]:
     import httpx
 
     width, height = size
@@ -147,7 +151,8 @@ def _runware_bytes(prompt: str, size: tuple[int, int], references: list[Path]) -
         "outputFormat": "JPG",
         "outputQuality": 95,
         "deliveryMethod": "sync",
-        "includeCost": False,
+        # Reports the exact USD this task billed, on the image result (see ``cost`` below).
+        "includeCost": True,
     }
     if references:
         task["inputs"] = {"referenceImages": [f"data:{_mime_type(path)};base64,{_base64(path)}" for path in references]}
@@ -162,10 +167,11 @@ def _runware_bytes(prompt: str, size: tuple[int, int], references: list[Path]) -
     images = [item for item in body.get("data", []) if item.get("imageBase64Data")]
     if not images:
         raise RuntimeError("Runware returned no image data")
-    return base64.b64decode(images[0]["imageBase64Data"])
+    return base64.b64decode(images[0]["imageBase64Data"]), images[0].get("cost")
 
 
 def generate_image(
+    world: str,
     asset_type: str,
     label: str,
     description: str,
@@ -181,7 +187,8 @@ def generate_image(
     """Render one image (an asset, or a shot's ``"final"`` frame) with one provider and save it as ``{uuid8}-{label}`` in ``directory``.
 
     ``clause`` says how ``references`` are used (see ``build_prompt``). Raises
-    if the provider fails; nothing is written then.
+    if the provider fails; nothing is written then. What it billed is appended
+    to ``world``'s cost log (exact for Runware, estimated for OpenAI and Gemini).
     """
     if provider not in PROVIDERS:
         raise ValueError(f"provider must be one of {sorted(PROVIDERS)}")
@@ -191,13 +198,20 @@ def generate_image(
     openai_quality, thinking_level = QUALITY[quality]
     if provider == "openai":
         width, height = SIZES[ratio]
-        data = _openai_bytes(prompt, f"{width}x{height}", openai_quality, references)
+        data, usage = _openai_bytes(prompt, f"{width}x{height}", openai_quality, references)
+        usd, estimated = costs.openai_cost(usage), True
     elif provider == "runware":
-        data = _runware_bytes(prompt, SIZES[ratio], references)
+        data, cost = _runware_bytes(prompt, SIZES[ratio], references)
+        usd, estimated = cost, False
     else:
-        data = _gemini_bytes(prompt, ratio, "2K", thinking_level, references)
+        data, usage = _gemini_bytes(prompt, ratio, "2K", thinking_level, references)
+        usd, estimated = costs.gemini_cost(usage), True
     image_format = Image.open(BytesIO(data)).format
     path = directory / f"{uuid.uuid4().hex[:8]}-{label}{_EXTENSIONS.get(image_format, '.png')}"
     directory.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
+    try:
+        costs.record(world, asset_type, label, provider, usd, estimated)
+    except Exception:
+        pass  # a logging bug must never cost an already-paid-for render.
     return path
