@@ -133,10 +133,21 @@ def render_episodes(world: str) -> None:
                 notify('success', f"Deleted episode **{episode['name']}**.")
 
 
+def render_cost_summary(world: str) -> None:
+    costs = api.get(f"/worlds/{world}/costs")
+    if not costs['entries']:
+        return
+    note = " (estimated where a provider does not bill by the image)" if any(
+        e['estimated'] for e in costs['entries']
+    ) else ""
+    st.caption(f"Spent on renders in **{world}** so far: **${costs['total']:.2f}**{note}.")
+
+
 def main() -> None:
     world, _ = render_world_switcher()
 
     st.title(world)
+    render_cost_summary(world)
     show_notice()
 
     tab_names = [*ASSET_TABS.values(), "Episodes"]

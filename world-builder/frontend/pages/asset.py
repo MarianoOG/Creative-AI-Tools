@@ -145,25 +145,29 @@ def render_new_variation(asset: Dict, provider: str) -> None:
 
 def render_new_views(asset: Dict, options: Dict, provider: str) -> None:
     have = {variation['name'] for variation in asset['variations']}
-    missing = [view for view in options['location_views'] if view not in have]
+    all_views = options['location_views']
+    first = all_views[0]
+    missing = [view for view in all_views if view not in have]
     if not missing:
         return
-    first = options['location_views'][0]
-    st.subheader("Missing views")
-    st.caption(
-        f"Rendered: {', '.join(missing)}. The {first} view comes from the description; "
-        "the others are drawn from it, in parallel."
-    )
+    # Only the establishing view is offered until it exists; every other view is drawn from it.
+    offerable = [first] if first in missing else missing
+    st.subheader("New view")
+    key = f"view_pick_{asset_key(asset)}"
+    target = offerable[0] if len(offerable) == 1 else st.selectbox("View", offerable, key=key)
     uploads = []
-    if first in missing:
+    if target == first:
+        st.caption("Drawn from the description. The first view generated becomes the preferred image.")
         uploads = reference_uploader(
-            f"views_uploads_{asset['name']}", "Inspiration for the establishing view. Kept for regenerating."
+            f"views_uploads_{asset_key(asset)}", "Inspiration for the establishing view. Kept for regenerating."
         )
-    if st.button(f"Generate {len(missing)} view(s)", type="primary", key=f"views_go_{asset['name']}"):
-        data = {'world': asset['world'], 'name': asset['name'], 'provider': provider}
-        with show_errors(), st.spinner(f"Rendering {len(missing)} view(s)... this can take a while."):
+    else:
+        st.caption(f"Drawn from the **{first}** view.")
+    if st.button(f"Generate {target} view", type="primary", key=f"views_go_{asset_key(asset)}_{target}"):
+        data = {'world': asset['world'], 'name': asset['name'], 'view': target, 'provider': provider}
+        with show_errors(), st.spinner(f"Rendering the {target} view... this can take a while."):
             result = api.post("/assets/views", data=data, files=as_files(uploads))
-            finish(result, f"Rendered the views of **{asset['name']}**.")
+            finish(result, f"Rendered the {target} view of **{asset['name']}**.")
 
 
 def main() -> None:

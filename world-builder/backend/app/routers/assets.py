@@ -132,9 +132,9 @@ def _render(world: str, asset_type: str, asset: Dict, variation: str, change: st
         raise HTTPException(422, str(exc)) from exc
     with provider_errors(provider):
         return generate_image(
-            asset_type=asset_type, label=f"{asset['name']}-{variation}", description=description, style=style,
-            directory=world_dir(world) / ASSET_DIRS[asset_type], provider=provider, references=references,
-            clause=clause, **options,
+            world=world, asset_type=asset_type, label=f"{asset['name']}-{variation}", description=description,
+            style=style, directory=world_dir(world) / ASSET_DIRS[asset_type], provider=provider,
+            references=references, clause=clause, **options,
         )
 
 
@@ -269,23 +269,28 @@ def add_variation(
 def add_views(
     world: Annotated[str, Form()],
     name: Annotated[str, Form()],
+    view: Annotated[Optional[str], Form()] = None,
     provider: Annotated[str, Form()] = DEFAULT_PROVIDER,
     uploads: Annotated[List[UploadFile], File()] = [],
 ) -> Dict:
-    """Render every fixed view a location is missing: the establishing view first, when missing, then the rest in parallel.
+    """Render one fixed view of a location: the establishing view by default, or a named one afterwards.
 
-    ``uploads`` go to the establishing view (when it is missing); the other
-    views are drawn from it. Views already made are kept if another one fails.
+    The establishing view is drawn from the description; every other view is
+    drawn from it, so it must exist first. ``uploads`` are inspiration for the
+    establishing view only, kept for regenerating.
     """
     _check(world, "location")
     check_provider(provider)
     asset = _asset(world, "location", name)
-    missing = [view for view in LOCATION_VIEWS if library.variation_named(asset, view) is None]
-    if not missing:
-        raise HTTPException(409, f"{name!r} already has every view - regenerate one instead.")
-    references = _keep_uploads(world, f"{name}-{ESTABLISHING_VIEW}", uploads) if ESTABLISHING_VIEW in missing else []
-    jobs = [(view, "", references if view == ESTABLISHING_VIEW else []) for view in missing]
-    return _render_many(world, "location", name, jobs, provider, anchor=ESTABLISHING_VIEW)
+    target = view or ESTABLISHING_VIEW
+    if target not in LOCATION_VIEWS:
+        raise HTTPException(422, f"view must be one of {sorted(LOCATION_VIEWS)}")
+    if library.variation_named(asset, target) is not None:
+        raise HTTPException(409, f"{name!r} already has the {target!r} view - regenerate it instead.")
+    if target != ESTABLISHING_VIEW and library.variation_named(asset, ESTABLISHING_VIEW) is None:
+        raise HTTPException(409, f"{name!r} has no establishing view yet - generate that first.")
+    references = _keep_uploads(world, f"{name}-{target}", uploads) if target == ESTABLISHING_VIEW else []
+    return _render_many(world, "location", name, [(target, "", references)], provider, anchor=target)
 
 
 @router.post("/regenerate")
