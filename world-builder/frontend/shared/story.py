@@ -79,6 +79,28 @@ def generate_shots(world: str, episode: str, shots: List[Tuple[str, str]], what:
         notify('success', f"Generated {len(shots)} {what}(s).")
 
 
+def save_shot_setting(world: str, episode: str, scene_id: str, shot_id: str, field: str, key: str,
+                      reload_script: bool) -> None:
+    """Save one shot's video ``camera`` or ``duration`` as picked in widget ``key``, and nothing else.
+
+    Runs as the widget's on_change on both the Script and the Video page, so the two always show
+    what is saved. With ``reload_script`` (the Video page), the Script page's fields reload from the
+    saved script next time, so it never saves an old value back; the Script page itself passes
+    ``False`` so its other unsaved typing stays in place.
+    """
+    try:
+        script = api.get(episode_url(world, episode))
+        for scene in script['scenes']:
+            for shot in scene['shots']:
+                if scene['id'] == scene_id and shot['id'] == shot_id:
+                    shot[field] = st.session_state[key]
+        api.put(episode_url(world, episode), json=script)
+        if reload_script:
+            st.session_state.script_revision += 1
+    except api.ApiError as exc:
+        st.session_state.notice = ('error', f"Could not save {scene_id}/{shot_id}: {exc}")
+
+
 def pick_episode(world: str, container=st) -> Optional[str]:
     """The episode select box, drawn in ``container`` (the page, or ``st.sidebar``). Remembers the choice in ``current_episode``."""
     episodes = api.get(f"/worlds/{world}/episodes")['episodes']

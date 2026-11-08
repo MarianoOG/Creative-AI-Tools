@@ -17,7 +17,9 @@ import streamlit as st
 
 import api
 from shared.state import show_notice
-from shared.story import build_zip, episode_url, export_files, generate_shots, pick_episode, shots_in_order
+from shared.story import (
+    build_zip, episode_url, export_files, generate_shots, pick_episode, save_shot_setting, shots_in_order,
+)
 from shared.ui import grid, plural
 from shared.worlds import render_world_switcher
 
@@ -31,34 +33,19 @@ def money(usd: float) -> str:
     return f"\\${usd:.2f}"
 
 
-def save_setting(world: str, episode: str, scene_id: str, shot_id: str, field: str, key: str) -> None:
-    """Save one shot's ``camera`` or ``duration`` as picked in widget ``key``. Runs as the widget's on_change."""
-    try:
-        script = api.get(episode_url(world, episode))
-        for scene in script['scenes']:
-            for shot in scene['shots']:
-                if scene['id'] == scene_id and shot['id'] == shot_id:
-                    shot[field] = st.session_state[key]
-        api.put(episode_url(world, episode), json=script)
-        # The Script page's fields reload from the saved script, so it never saves the old value back.
-        st.session_state.script_revision += 1
-    except api.ApiError as exc:
-        st.session_state.notice = ('error', f"Could not save {scene_id}/{shot_id}: {exc}")
-
-
 def render_settings(world: str, episode: str, scene: Dict, shot: Dict, video: Dict) -> None:
     """The shot's camera move and clip length, saved as soon as either changes."""
     camera_col, length_col = st.columns([3, 2])
     prefix = f"video_{world}_{episode}_{scene['id']}_{shot['id']}_{st.session_state.script_revision}_"
     camera_col.selectbox(
         "Camera", video['camera_moves'], index=video['camera_moves'].index(shot['camera']),
-        key=f"{prefix}camera", on_change=save_setting,
-        args=(world, episode, scene['id'], shot['id'], 'camera', f"{prefix}camera"),
+        key=f"{prefix}camera", on_change=save_shot_setting,
+        args=(world, episode, scene['id'], shot['id'], 'camera', f"{prefix}camera", True),
     )
     length_col.selectbox(
         "Length", video['durations'], index=video['durations'].index(shot['duration']),
-        format_func=lambda seconds: f"{seconds} s", key=f"{prefix}duration", on_change=save_setting,
-        args=(world, episode, scene['id'], shot['id'], 'duration', f"{prefix}duration"),
+        format_func=lambda seconds: f"{seconds} s", key=f"{prefix}duration", on_change=save_shot_setting,
+        args=(world, episode, scene['id'], shot['id'], 'duration', f"{prefix}duration", True),
     )
 
 
