@@ -81,12 +81,10 @@ def generate_shots(world: str, episode: str, shots: List[Tuple[str, str]], what:
 
 def save_shot_setting(world: str, episode: str, scene_id: str, shot_id: str, field: str, key: str,
                       reload_script: bool) -> None:
-    """Save one shot's video ``camera`` or ``duration`` as picked in widget ``key``, and nothing else.
+    """Save one shot setting (``type`` on the Storyboard, ``camera`` or ``duration`` on the Video page)
+    as picked in widget ``key``, and nothing else. Runs as the widget's on_change.
 
-    Runs as the widget's on_change on both the Script and the Video page, so the two always show
-    what is saved. With ``reload_script`` (the Video page), the Script page's fields reload from the
-    saved script next time, so it never saves an old value back; the Script page itself passes
-    ``False`` so its other unsaved typing stays in place.
+    With ``reload_script``, the Script page's fields reload from the saved script next time.
     """
     try:
         script = api.get(episode_url(world, episode))

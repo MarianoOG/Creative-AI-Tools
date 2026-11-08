@@ -1,14 +1,11 @@
 """Script: the whole episode, scene by scene and shot by shot, all editable in place.
 
-The script is text only: nothing is generated here. The frames are made on the
-Storyboard page, and the videos (with each shot's camera move and clip
-length, set here) on the Video page.
+The script is text only: nothing is generated here. Each shot here is just
+its action. Its type is set, and its frame made, on the Storyboard page; its
+camera move and clip length are set, and its video made, on the Video page.
 
 Every change (save, add, remove, delete) first collects what is typed
 anywhere on the page and saves the whole episode, so no unsaved edit is lost.
-A shot's camera move and clip length are the exception: each saves on its
-own as soon as it changes, the same way as on the Video page, so the two
-pages always show the same values.
 """
 
 from __future__ import annotations
@@ -20,7 +17,7 @@ import streamlit as st
 
 import api
 from shared.state import notify, show_notice
-from shared.story import asset_names, episode_url, pick_episode, save_shot_setting, scene_fields
+from shared.story import asset_names, episode_url, pick_episode, scene_fields
 from shared.ui import show_errors
 from shared.worlds import render_world_switcher
 
@@ -46,43 +43,22 @@ def action_height(text: str) -> int:
     return min(400, max(68, 24 * lines + 20))
 
 
-def render_shot(shot: Dict, prefix: str, shot_types: List[str], video: Dict, where: Tuple[str, str, str]) -> Dict[str, bool]:
-    """One shot: its number, type, camera move, clip length and action, with a remove button.
-
-    The camera move and clip length save as soon as they change (as on the Video page), so both
-    pages always agree; ``where`` is the shot's ``(world, episode, scene)``.
-    """
-    id_col, type_col, camera_col, length_col, remove_col = st.columns(
-        [1, 3, 2, 1.2, 0.4], vertical_alignment='center'
-    )
+def render_shot(shot: Dict, prefix: str) -> Dict[str, bool]:
+    """One shot: its number, its action and a remove button. Its type is set on the Storyboard, and its
+    video's camera move and length on the Video page."""
+    id_col, action_col, remove_col = st.columns([1, 10, 0.6], vertical_alignment='top')
     id_col.markdown(f"**{shot['id']}**")
-    type_col.selectbox(
-        "Shot type", shot_types, index=shot_types.index(shot['type']) if shot['type'] in shot_types else None,
-        placeholder="Shot type", label_visibility='collapsed', key=shot_key(prefix, shot, 'type'),
-    )
-    camera_col.selectbox(
-        "Camera", video['camera_moves'], index=video['camera_moves'].index(shot['camera']),
-        label_visibility='collapsed', key=shot_key(prefix, shot, 'camera'), help="The video's camera move (saved at once)",
-        on_change=save_shot_setting, args=(*where, shot['id'], 'camera', shot_key(prefix, shot, 'camera'), False),
-    )
-    length_col.selectbox(
-        "Clip length", video['durations'], index=video['durations'].index(shot['duration']),
-        format_func=lambda seconds: f"{seconds} s", label_visibility='collapsed',
-        key=shot_key(prefix, shot, 'duration'), help="The video's length (saved at once)",
-        on_change=save_shot_setting, args=(*where, shot['id'], 'duration', shot_key(prefix, shot, 'duration'), False),
+    action_col.text_area(
+        "Action", value=shot['action'], height=action_height(shot['action']),
+        label_visibility='collapsed', placeholder="What happens in this shot", key=shot_key(prefix, shot, 'action'),
     )
     removed = remove_col.button(
         "", icon=":material/delete:", help="Remove the shot", key=shot_key(prefix, shot, 'remove'), width='stretch'
     )
-    st.text_area(
-        "Action", value=shot['action'], height=action_height(shot['action']),
-        label_visibility='collapsed', placeholder="What happens in this shot", key=shot_key(prefix, shot, 'action'),
-    )
     return {'remove': removed}
 
 
-def render_scene(scene: Dict, number: int, prefix: str, names: Dict, shot_types: List[str],
-                 video: Dict, world: str, episode: str) -> Tuple[Dict, Dict]:
+def render_scene(scene: Dict, number: int, prefix: str, names: Dict) -> Tuple[Dict, Dict]:
     """A scene's heading, summary, references and shots, all as fields. Returns the scene as typed, and what was clicked."""
     title_col, delete_col = st.columns([4, 1], vertical_alignment='center')
     title_col.subheader(f"Scene {number} · `{scene['id']}`")
@@ -93,20 +69,19 @@ def render_scene(scene: Dict, number: int, prefix: str, names: Dict, shot_types:
 
     st.markdown("**Shots**")
     shots = {
-        shot['id']: render_shot(shot, prefix, shot_types, video, (world, episode, scene['id'])) for shot in scene['shots']
+        shot['id']: render_shot(shot, prefix) for shot in scene['shots']
     }
     add_clicked = st.button("Add shot", icon=":material/add:", key=f"{prefix}add")
     return edited, {'shots': shots, 'add': add_clicked, 'delete': delete_clicked}
 
 
 def collect(edited: Dict, prefix: str) -> Dict:
-    """The scene as currently typed: ``edited`` scene fields plus every shot's type, action, camera and length."""
+    """The scene as currently typed: ``edited`` scene fields plus every shot's action.
+
+    A shot's type, camera move and length are left out, so the save keeps what is on disk.
+    """
     state = st.session_state
-    shots = [
-        {'id': shot['id'], **{field: state[shot_key(prefix, shot, field)]
-                              for field in ('type', 'action', 'camera', 'duration')}}
-        for shot in edited['shots']
-    ]
+    shots = [{'id': shot['id'], 'action': state[shot_key(prefix, shot, 'action')]} for shot in edited['shots']]
     return {**edited, 'shots': shots}
 
 
@@ -129,12 +104,11 @@ def main() -> None:
     header = render_header(episode, script, options['aspect_ratios'])
 
     names = asset_names(world)
-    shot_types = options.get('shot_types', [])
     scenes = []
     for number, scene in enumerate(script['scenes'], start=1):
         st.divider()
         prefix = f"sc_{world}_{episode}_{st.session_state.script_revision}_{scene['id']}_"
-        edited, actions = render_scene(scene, number, prefix, names, shot_types, options['video'], world, episode)
+        edited, actions = render_scene(scene, number, prefix, names)
         scenes.append((scene['id'], prefix, edited, actions))
     st.divider()
     new_scene, new_scene_clicked = render_new_scene(len(script['scenes']))
@@ -150,7 +124,7 @@ def main() -> None:
             edited['shots'] = [shot for shot in edited['shots'] if shot['id'] not in removed]
         if actions['add']:
             # The backend numbers it; an id no shot has keeps it from taking another shot's frames.
-            edited['shots'].append({'id': "new", 'type': None, 'action': ""})
+            edited['shots'].append({'id': "new", 'action': ""})
         if actions['delete']:
             deleted = scene_id
         changed = changed or bool(removed) or actions['add'] or actions['delete']

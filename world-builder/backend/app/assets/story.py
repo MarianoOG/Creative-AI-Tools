@@ -62,8 +62,9 @@ SCRIPT_FILE = "script.json"
 
 #: A shot's file fields -> the key ``with_images`` gives each one's data-relative path.
 SHOT_FILES = {"image": "path", "final": "final_path", "video": "video_path"}
-#: A shot's video settings. Like its files, a save that leaves them out keeps what is on disk.
-SHOT_VIDEO_SETTINGS = ("duration", "camera")
+#: A shot's settings, each edited on its own page (type on the Storyboard, duration and camera on Video).
+#: Like its files, a save that leaves them out keeps what is on disk.
+SHOT_SETTINGS = ("type", "duration", "camera")
 
 #: The framings a shot can have, from the widest to the tightest.
 SHOT_TYPES = [
@@ -162,7 +163,7 @@ def save_script(world: str, episode: str, raw: Dict) -> Script:
     with _lock:
         current = read_script(world, episode)
         frames = {
-            (scene["id"], shot["id"]): {field: shot[field] for field in (*SHOT_FILES, *SHOT_VIDEO_SETTINGS)}
+            (scene["id"], shot["id"]): {field: shot[field] for field in (*SHOT_FILES, *SHOT_SETTINGS)}
             for scene in current["scenes"] for shot in scene["shots"]
         }
         raw = {

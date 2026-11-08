@@ -19,7 +19,7 @@ from pydantic import BaseModel
 
 from app.assets import library, story, video
 from app.assets.generation import (
-    ASPECT_RATIOS, DEFAULT_FINAL_PROVIDER, DEFAULT_PROVIDER, FINAL_PROVIDERS, PROVIDERS, generate_image,
+    ASPECT_RATIOS, DEFAULT_FINAL_PROVIDER, DEFAULT_PROVIDER, FINAL_PROVIDERS, PRICE_ESTIMATES, PROVIDERS, generate_image,
 )
 from app.assets.prompt_manager import (
     ASSET_DIRS, ESTABLISHING_VIEW, LEGACY_VIEW_CHANGES, STYLES, build_prompt, variation_description,
@@ -186,6 +186,7 @@ def options() -> Dict:
         "default_provider": DEFAULT_PROVIDER,
         "final_providers": list(FINAL_PROVIDERS),
         "default_final_provider": DEFAULT_FINAL_PROVIDER,
+        "price_estimates": PRICE_ESTIMATES,
         "aspect_ratios": list(ASPECT_RATIOS),
         "shot_types": story.SHOT_TYPES,
         "establishing_view": ESTABLISHING_VIEW,

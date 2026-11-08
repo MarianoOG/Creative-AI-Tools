@@ -33,6 +33,9 @@ PROVIDERS = {
     "runware": "Runware Flux 2 Klein 4B (~$0.015/image)",
 }
 DEFAULT_PROVIDER = "openai"
+#: Rough USD per 2K high-quality image, shown before a render until the world's cost log has real ones.
+#: OpenAI bills per token, so it has no fixed figure.
+PRICE_ESTIMATES = {"openai": None, "gemini": 0.05, "runware": 0.015}
 #: The models a final frame can use (all of them), and the default one.
 FINAL_PROVIDERS = tuple(PROVIDERS)
 DEFAULT_FINAL_PROVIDER = "gemini"

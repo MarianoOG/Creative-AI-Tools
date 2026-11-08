@@ -5,8 +5,7 @@ video that is missing, or older than a regenerated frame (flagged), stands out.
 A clip starts from the shot's final frame and is prompted with the world's
 style, the shot's text (the scene's heading, summary and cast, and the shot's
 type and action) and its camera move, with no dialogue or voices. Each shot's
-camera move and clip length are saved with the shot (also editable on the
-Script page). A shot needs its final frame first (the Storyboard page). Every
+camera move and clip length are set only here, and saved with the shot. A shot needs its final frame first (the Storyboard page). Every
 clip is a paid render, so its price is shown before each button; the billed
 figure lands in the world's cost log.
 """
