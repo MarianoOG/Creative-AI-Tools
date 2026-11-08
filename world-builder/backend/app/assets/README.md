@@ -7,7 +7,7 @@ Gemini (Nano Banana 2) or Runware (Flux 2 Klein), always in the world's style:
 | --- | --- | --- |
 | `character` | Turnaround sheet: front, three-quarter, back on white | inspiration (uploads) |
 | `object` | Turnaround sheet: front isometric and side views on white | inspiration (uploads) |
-| `location` | Empty background plate, no figures, in three views | inspiration (uploads) |
+| `location` | Empty background plate, no figures, establishing shot first | inspiration (uploads) |
 | `final` | A shot's frame | the scene's assets as designs to reproduce faithfully |
 
 An asset is created as just a name and a description, with no images. Its
@@ -17,15 +17,16 @@ first one made, until another is picked):
 - Characters and objects take any named variation (new clothes, older, broken,
   dirty...). The first is drawn from the description; later ones from the
   preferred image, as the design to keep, plus what the variation says changes.
-- A location's variations are the fixed views of `LOCATION_VIEWS`
-  (`establishing`, `reverse`, `detail`), rendered together: the establishing
-  view from the description, the others from it as the same place.
+- A location works the same way, except that its first image is always the
+  `establishing` shot, drawn from the description. Its other variations are
+  named and described freely (a reverse angle, night, after the storm...) and
+  drawn from the establishing shot as the same empty place.
 
 Any variation can be regenerated, or all of them at once (the preferred image,
 or the establishing view, first), from the asset's current description and the
 reference images it was made with.
 
-- `prompt_manager.py`: prompt text (style presets, framing per type, location views, reference clauses). No I/O.
+- `prompt_manager.py`: prompt text (style presets, framing per type, location camera, reference clauses). No I/O.
 - `generation.py`: provider calls and writing files.
 - `worlds.py`: creating, renaming and deleting worlds, and reading and writing their `world.json`.
 - `library.py`: assets, their variations and the preferred one, in `world.json`.
@@ -79,7 +80,7 @@ into a hidden `.deleted/` folder beside it.
     ]
   }],
   "locations": [{"name": "night_market", "description": "...", "variations": [
-    {"name": "establishing", "...": "..."}, {"name": "reverse", "...": "..."}, {"name": "detail", "...": "..."}
+    {"name": "establishing", "...": "..."}, {"name": "night", "description": "After dusk, lanterns lit.", "...": "..."}
   ]}],
   "objects": []
 }
@@ -123,7 +124,7 @@ scene entry without a folder is dropped on the next save.
 
 `characters`, `locations` and `objects` hold references: `name` for an asset's
 preferred image, `name:variation` for a specific one (`fox_hero:older`,
-`night_market:reverse`). A shot's `final` is its frame in the
+`night_market:night`). A shot's `final` is its frame in the
 scene folder. Its `image` names an older storyboard preview, kept as it is
 (nothing renders one any more; scripts from before it get the newest file
 named after the shot); `final_provider` is the model the
@@ -135,8 +136,7 @@ one moves the later ones up, each keeping its frames.
 
 `POST /assets` creates an asset (no images) and `PATCH /assets` renames it,
 changes its description or picks its preferred variation. `POST
-/assets/variations` (characters, objects), `POST /assets/views` (a location's
-missing views), `POST /assets/regenerate` and
+/assets/variations` (any asset; a location's first is its establishing shot), `POST /assets/regenerate` and
 `POST /worlds/{world}/episodes/{episode}/scenes/{scene}/shots/{shot}/generate`
 wait for the render and return the result. Each image is rendered by one
 `provider` (`openai`, `gemini` or `runware`).
@@ -145,8 +145,7 @@ wait for the render and return the result. Each image is rendered by one
   empty. New worlds can start from a preset (`STYLES` in `prompt_manager.py`).
   The `ligne_claire_lineart` preset, kept word for word, also swaps in line-only
   framing for locations and final frames.
-- **assets**: always landscape (16:9) and high quality. Several renders (a
-  location's views, regenerate all) run one after another; if one fails, the
+- **assets**: always landscape (16:9) and high quality. Several renders (regenerate all) run one after another; if one fails, the
   ones already made are kept and the failure comes back as a `warning`.
 - **final frames**: the shot endpoint, with `{"provider": "openai" | "gemini" | "runware"}`
   (the episode's last one when left out), renders the shot's finished, fully

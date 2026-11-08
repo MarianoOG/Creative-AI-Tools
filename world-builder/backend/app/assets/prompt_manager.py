@@ -143,26 +143,30 @@ _LOCATION_COMPOSITION = (
     "animals, and no foreground subject of any kind anywhere in the frame. "
 )
 
-#: The fixed views every location is rendered in, in order. The first is the
-#: establishing view; the others are rendered from it as the same place.
+#: The camera sentence of a location's framing. A location is first rendered in
+#: its establishing view; every variation after it is drawn from that image, and
+#: its own description says what changes (angle, time of day, weather, state...).
 LOCATION_VIEWS: dict[str, str] = {
     "establishing": (
         "Wide establishing view of the space itself with a consistent single-point "
         "perspective and a clear horizon. "
     ),
+    "variation": "",
+}
+#: The view a location is first rendered in, and the one its variations are drawn from.
+ESTABLISHING_VIEW = next(iter(LOCATION_VIEWS))
+#: What the fixed views of earlier versions showed, used when one of them is regenerated without a description.
+LEGACY_VIEW_CHANGES: dict[str, str] = {
     "reverse": (
-        "Reverse angle: the camera stands on the far side of the space and looks "
-        "back towards where the establishing view was taken, so the opposite side "
-        "of the same place fills the frame, with a consistent single-point "
-        "perspective and a clear horizon. "
+        "Reverse angle: the camera stands on the far side of the space and looks back "
+        "towards where the establishing view was taken, so the opposite side of the same "
+        "place fills the frame, with a consistent single-point perspective and a clear horizon."
     ),
     "detail": (
         "Closer medium view at eye level of one characteristic corner of the space, "
-        "framed as a backdrop a character could stand in, with the ground visible. "
+        "framed as a backdrop a character could stand in, with the ground visible."
     ),
 }
-#: The view a location is first rendered in, and the one its other views are drawn from.
-ESTABLISHING_VIEW = next(iter(LOCATION_VIEWS))
 _LOCATION_TAIL = "No text, no signage lettering, no watermarks, no borders."
 
 _SHOT_TAIL = (
@@ -211,7 +215,7 @@ MONOCHROME_FRAMING: dict[str, str] = {
 _MONOCHROME_STYLES = {STYLES["ligne_claire_lineart"]}
 
 #: How references are used. New characters, objects and locations take them as
-#: inspiration (never for the style); variations and location views take them
+#: inspiration (never for the style); variations take them
 #: as designs to reproduce.
 REFERENCE_CLAUSES: dict[str, str] = {
     "character": (
@@ -260,12 +264,15 @@ REFERENCE_CLAUSES: dict[str, str] = {
         "Any further reference images are inspiration for that change only; do not "
         "adopt their art style. The style is defined by the style description above."
     ),
-    "view": (
-        "The reference image is the establishing view of this exact location, and "
-        "it is fact, not inspiration. Show the same place — the same layout, "
-        "architecture, materials, palette, weather and time of day — only from the "
-        "camera position described here. Do not invent a different or neighbouring "
-        "place, and keep it empty of figures."
+    "location_variation": (
+        "The first reference image is the established design of this exact "
+        "location, and it is fact, not inspiration: keep its layout, architecture, "
+        "materials and colour palette, and change only what the variation above "
+        "describes (a different angle, time of day, weather or state of the place). "
+        "Do not invent a different or neighbouring place, and keep it empty of "
+        "figures. Any further reference images are inspiration for that change "
+        "only; do not adopt their art style. The style is defined by the style "
+        "description above."
     ),
     "final": (
         "The reference images are listed above in the order they are attached. "
@@ -281,7 +288,7 @@ REFERENCE_CLAUSES: dict[str, str] = {
 
 
 def variation_description(description: str, variation: str, change: str) -> str:
-    """What a variation of a character or object shows: the subject, then what is different."""
+    """What a variation of a character, location or object shows: the subject, then what is different."""
     return f"{description.strip()}\n\nVariation \"{variation}\": {change.strip()}"
 
 

@@ -1,10 +1,10 @@
 """Characters, objects and locations: create, edit, and generate their variations. Assets live in each world's ``world.json``.
 
 Every image is rendered landscape at high quality, by one provider. A
-character or object variation is rendered from the asset's preferred image (the
-design to keep) once there is one. A location's variations are the fixed views
-of ``LOCATION_VIEWS``: the establishing view from the description, the others
-from the establishing view. Nothing here removes a file.
+variation is rendered from the asset's preferred image (the design to keep) once
+there is one. A location's first image is always its ``establishing`` view,
+drawn from the description; its other variations are named and described freely,
+and drawn from the establishing view. Nothing here removes a file.
 """
 
 from __future__ import annotations
@@ -22,15 +22,13 @@ from app.assets.generation import (
     ASPECT_RATIOS, DEFAULT_FINAL_PROVIDER, DEFAULT_PROVIDER, FINAL_PROVIDERS, PROVIDERS, generate_image,
 )
 from app.assets.prompt_manager import (
-    ASSET_DIRS, ESTABLISHING_VIEW, LOCATION_VIEWS, STYLES, build_prompt, variation_description,
+    ASSET_DIRS, ESTABLISHING_VIEW, LEGACY_VIEW_CHANGES, STYLES, build_prompt, variation_description,
 )
 from app.assets.worlds import DEFAULT_WORLD, read_style, slugify, world_dir
 from app.routers.common import call, check_world, provider_errors
 
 router = APIRouter(prefix="/assets", tags=["assets"])
 
-#: Asset types whose variations are named freely. Locations have their fixed views instead.
-VARIABLE_TYPES = ("character", "object")
 #: How many variations of one asset render at once. Provider rate limits are the ceiling.
 PARALLEL_RENDERS = 4
 
@@ -116,10 +114,14 @@ def _render(world: str, asset_type: str, asset: Dict, variation: str, change: st
     subject = asset["description"] or asset["name"].replace("_", " ")
     anchor = _anchor(world, asset_type, asset, variation)
     options: Dict = {}
-    if asset_type == "location":
-        description = subject
-        references, clause = ([anchor], "view") if anchor else (uploads, "location")
-        options["view"] = variation
+    if asset_type == "location" and variation == ESTABLISHING_VIEW:
+        description = f"{subject}\n\n{change}".strip()
+        references, clause = uploads, "location"
+    elif asset_type == "location":
+        change = change or LEGACY_VIEW_CHANGES.get(variation) or variation.replace("_", " ")
+        description = variation_description(subject, variation, change)
+        references, clause = ([anchor, *uploads], "location_variation") if anchor else (uploads, "location")
+        options["view"] = "variation"
     elif anchor:
         description = variation_description(subject, variation, change or variation.replace("_", " "))
         references, clause = [anchor, *uploads], "variation"
@@ -186,7 +188,7 @@ def options() -> Dict:
         "default_final_provider": DEFAULT_FINAL_PROVIDER,
         "aspect_ratios": list(ASPECT_RATIOS),
         "shot_types": story.SHOT_TYPES,
-        "location_views": list(LOCATION_VIEWS),
+        "establishing_view": ESTABLISHING_VIEW,
         "default_world": DEFAULT_WORLD,
     }
 
@@ -242,55 +244,34 @@ def add_variation(
     world: Annotated[str, Form()],
     asset_type: Annotated[str, Form()],
     name: Annotated[str, Form()],
-    variation: Annotated[str, Form()],
+    variation: Annotated[str, Form()] = "",
     description: Annotated[str, Form()] = "",
     provider: Annotated[str, Form()] = DEFAULT_PROVIDER,
     uploads: Annotated[List[UploadFile], File()] = [],
 ) -> Dict:
-    """Generate a named variation of a character or object (new clothes, older, broken...).
+    """Generate a named variation of any asset (new clothes, older, broken, night, a reverse angle...).
 
     The first one is drawn from the asset's description; later ones from its
-    preferred image, with ``description`` saying what changes. ``uploads`` are
-    inspiration, kept for regenerating.
+    preferred image, with ``description`` saying what changes. A location's
+    first variation is always its ``establishing`` view (any ``variation`` name
+    is ignored); the ones after it need a ``description`` of what is different.
+    ``uploads`` are inspiration, kept for regenerating.
     """
-    _check(world, asset_type, VARIABLE_TYPES)
+    _check(world, asset_type)
     check_provider(provider)
     asset = _asset(world, asset_type, name)
-    slug = slugify(variation)
+    if asset_type == "location" and not asset["variations"]:
+        slug = ESTABLISHING_VIEW
+    else:
+        slug = slugify(variation)
     if not slug:
         raise HTTPException(422, "Give the variation a name.")
     if library.variation_named(asset, slug) is not None:
         raise HTTPException(409, f"{name!r} already has a variation called {slug!r}.")
+    if asset_type == "location" and slug != ESTABLISHING_VIEW and not description.strip():
+        raise HTTPException(422, "Describe what is different in this variation of the location.")
     references = _keep_uploads(world, f"{name}-{slug}", uploads)
     return {"asset": _render_and_save(world, asset_type, name, slug, description.strip(), provider, references)}
-
-
-@router.post("/views")
-def add_views(
-    world: Annotated[str, Form()],
-    name: Annotated[str, Form()],
-    view: Annotated[Optional[str], Form()] = None,
-    provider: Annotated[str, Form()] = DEFAULT_PROVIDER,
-    uploads: Annotated[List[UploadFile], File()] = [],
-) -> Dict:
-    """Render one fixed view of a location: the establishing view by default, or a named one afterwards.
-
-    The establishing view is drawn from the description; every other view is
-    drawn from it, so it must exist first. ``uploads`` are inspiration for the
-    establishing view only, kept for regenerating.
-    """
-    _check(world, "location")
-    check_provider(provider)
-    asset = _asset(world, "location", name)
-    target = view or ESTABLISHING_VIEW
-    if target not in LOCATION_VIEWS:
-        raise HTTPException(422, f"view must be one of {sorted(LOCATION_VIEWS)}")
-    if library.variation_named(asset, target) is not None:
-        raise HTTPException(409, f"{name!r} already has the {target!r} view - regenerate it instead.")
-    if target != ESTABLISHING_VIEW and library.variation_named(asset, ESTABLISHING_VIEW) is None:
-        raise HTTPException(409, f"{name!r} has no establishing view yet - generate that first.")
-    references = _keep_uploads(world, f"{name}-{target}", uploads) if target == ESTABLISHING_VIEW else []
-    return _render_many(world, "location", name, [(target, "", references)], provider, anchor=target)
 
 
 @router.post("/regenerate")

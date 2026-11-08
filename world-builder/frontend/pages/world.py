@@ -53,8 +53,7 @@ def render_tile(world: str, asset: dict) -> None:
     with st.expander("Details"):
         if asset['description']:
             st.write(asset['description'])
-        noun = 'view' if asset_type == 'location' else 'variation'
-        st.caption(plural(len(asset['variations']), noun)
+        st.caption(plural(len(asset['variations']), 'variation')
                    + (f" · preferred: {asset['preferred']}" if asset['preferred'] else ""))
         confirmed = st.checkbox("Confirm delete", key=f"confirm_{asset_type}_{name}")
         if st.button("Delete", icon=":material/delete:", disabled=not confirmed, key=f"delete_{asset_type}_{name}",
