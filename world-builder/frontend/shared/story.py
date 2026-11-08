@@ -137,12 +137,13 @@ def reference_label(reference: str) -> str:
 def scene_fields(scene: Dict, names: Dict[str, List[str]], prefix: str) -> Dict:
     """Edit a scene's heading, summary and references. Returns the scene with the edits applied."""
     heading = st.text_input("Heading", value=scene['heading'], placeholder="INT. KITCHEN - DAY", key=f"{prefix}heading")
-    summary = st.text_area("What happens", value=scene['summary'], height=90, key=f"{prefix}summary")
+    summary = st.text_area("What happens", value=scene['summary'], height=180, key=f"{prefix}summary")
     picks = {}
-    for field in REFERENCE_FIELDS:
+    # Characters, locations and objects side by side, on one line.
+    for column, field in zip(st.columns(len(REFERENCE_FIELDS)), REFERENCE_FIELDS):
         # Keep names whose asset is gone, so saving never drops them.
         options = names[field] + [name for name in scene[field] if name not in names[field]]
-        picks[field] = st.multiselect(
+        picks[field] = column.multiselect(
             field.capitalize(), options, default=scene[field], format_func=reference_label, key=f"{prefix}{field}"
         )
     return {**scene, 'heading': heading, 'summary': summary, **picks}
