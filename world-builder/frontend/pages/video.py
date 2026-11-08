@@ -143,7 +143,7 @@ def main() -> None:
     stale = [(scene['id'], shot['id']) for scene, shot in shots if is_stale(shot)]
     # Pending: no video yet, or one made from an older frame. Kept in story order.
     pending = [key for key in framed if key in set(missing) | set(stale)]
-    generate_all = regenerate_all = False
+    generate_all = False
     with action_col:
         if pending:
             generate_all = st.button(
@@ -152,13 +152,8 @@ def main() -> None:
                 help="Every shot with a frame but no video, plus every video older than its frame.",
             )
         if with_video:
-            # Regenerate all stays one small icon beside Export; it asks first, as every clip is a paid render.
-            refresh_col, export_col = st.columns([1, 4], vertical_alignment='bottom')
-            with refresh_col.popover("", icon=":material/refresh:", help="Regenerate all videos", width='stretch'):
-                st.write(f"Render all {plural(len(framed), 'video')} again for about "
-                         f"**{money(sum(prices[key] for key in framed))}**? The current files stay on disk.")
-                regenerate_all = st.button("Regenerate all", icon=":material/refresh:", type="primary")
-            export_col.download_button(
+            # No "regenerate all": re-rendering every clip at once is too expensive to offer. One at a time only.
+            st.download_button(
                 "Export all videos", data=build_zip(export_files(script, 'video_path')),
                 file_name=f"{world}_{episode}_videos.zip", mime="application/zip",
                 icon=":material/download:", width='stretch',
@@ -174,10 +169,7 @@ def main() -> None:
 
     st.divider()
     clicked = render_grid(world, episode, script, video)
-    if regenerate_all:
-        to_generate = framed
-    else:
-        to_generate = pending if generate_all else clicked
+    to_generate = pending if generate_all else clicked
     if to_generate:
         generate_shots(world, episode, to_generate, "video", action="video")
 

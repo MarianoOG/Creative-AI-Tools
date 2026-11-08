@@ -6,8 +6,8 @@ world's average logged cost for the model, else a rough list price).
 
 A final frame is the finished image of a shot, rendered once by OpenAI, Gemini or Runware (Flux 2 Klein) at high quality from
 the shot's text and the designs of everything the scene lists, in the world's
-style. Any one, or once all exist every one, can be
-regenerated; the old file stays on disk.
+style. Each one can be regenerated on its own (there is no "regenerate all": it
+costs too much to be one click away); the old file stays on disk.
 """
 
 from __future__ import annotations
@@ -98,29 +98,22 @@ def main() -> None:
     def batch_price(count: int) -> str:
         return price_label(price * count if price is not None else None)
 
-    generate_all = regenerate_all = False
+    generate_all = False
     with action_col:
         if missing:
             generate_all = st.button(
                 f"Generate {len(missing)} frame(s) · {batch_price(len(missing))}", type="primary", width='stretch'
             )
         else:
-            # Regenerate all stays one small icon beside Export; it asks first, as every frame is a paid render.
-            refresh_col, export_col = st.columns([1, 4], vertical_alignment='bottom')
-            with refresh_col.popover("", icon=":material/refresh:", help="Regenerate all frames", width='stretch'):
-                st.write(f"Render all {len(shots)} frames again ({batch_price(len(shots))})? The current files stay on disk.")
-                regenerate_all = st.button("Regenerate all", icon=":material/refresh:", type="primary")
-            export_col.download_button(
+            # No "regenerate all": re-rendering every frame at once is too expensive to offer. One at a time only.
+            st.download_button(
                 "Export all frames", data=build_zip(export_files(script, 'final_path')), file_name=f"{world}_{episode}.zip",
                 mime="application/zip", type="primary", icon=":material/download:", width='stretch',
             )
 
     st.divider()
     clicked = render_grid(world, episode, script, options['shot_types'], price)
-    if regenerate_all:
-        to_generate = [(scene['id'], shot['id']) for scene, shot in shots]
-    else:
-        to_generate = missing if generate_all else clicked
+    to_generate = missing if generate_all else clicked
     if to_generate:
         generate_shots(world, episode, to_generate, "frame", {'provider': provider})
 
