@@ -1,6 +1,6 @@
 """Worlds: the folders under ``WORLDS_DIR``, each holding one setting's ``world.json``, images and episodes.
 
-    <WORLDS_DIR>/<world>/world.json             style, characters, locations, objects
+    <WORLDS_DIR>/<world>/world.json             style, context, characters, locations, objects
     <WORLDS_DIR>/<world>/<asset-type-dir>/<file>
     <WORLDS_DIR>/<world>/episodes/...            (see story.py)
 
@@ -202,6 +202,7 @@ def _clean_asset(raw: Dict) -> Optional[Dict]:
 def _normalise(raw: Dict) -> World:
     return {
         "style": str(raw.get("style", "")).strip(),
+        "context": str(raw.get("context", "")).strip(),
         **{folder: _unique(raw.get(folder, []), _clean_asset) for folder in ASSET_DIRS.values()},
     }
 
@@ -239,6 +240,15 @@ def read_style(world: str) -> str:
 
 def write_style(world: str, style: str) -> None:
     save_world(world, {**read_world(world), "style": style})
+
+
+def read_context(world: str) -> str:
+    """The world's context: free notes about it (premise, cast, tone, ...), or ``""``. Never sent to a render."""
+    return read_world(world)["context"]
+
+
+def write_context(world: str, context: str) -> None:
+    save_world(world, {**read_world(world), "context": context})
 
 
 def create_world(name: str, style: str = "") -> str:

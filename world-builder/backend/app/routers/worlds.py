@@ -1,4 +1,4 @@
-"""Worlds: create, rename and delete the settings assets are grouped into, and edit their style."""
+"""Worlds: create, rename and delete the settings assets are grouped into, and edit their style and context."""
 
 from __future__ import annotations
 
@@ -10,7 +10,9 @@ from pydantic import BaseModel
 from app.assets import costs
 from app.assets.library import list_assets
 from app.assets.story import list_episodes
-from app.assets.worlds import create_world, delete_world, list_worlds, read_style, rename_world, write_style
+from app.assets.worlds import (
+    create_world, delete_world, list_worlds, read_context, read_style, rename_world, write_context, write_style,
+)
 from app.routers.common import call, check_world
 
 router = APIRouter(prefix="/worlds", tags=["worlds"])
@@ -23,6 +25,10 @@ class WorldName(BaseModel):
 
 class Style(BaseModel):
     style: str
+
+
+class Context(BaseModel):
+    context: str
 
 
 @router.get("")
@@ -62,6 +68,19 @@ def put_style(world: str, body: Style) -> Dict:
     check_world(world)
     call(write_style, world, body.style)
     return {"style": read_style(world)}
+
+
+@router.get("/{world}/context")
+def get_context(world: str) -> Dict:
+    """The world's context (in ``world.json``): free notes on its premise, cast and tone, for reference only."""
+    return {"context": call(read_context, world)}
+
+
+@router.put("/{world}/context")
+def put_context(world: str, body: Context) -> Dict:
+    check_world(world)
+    call(write_context, world, body.context)
+    return {"context": read_context(world)}
 
 
 @router.get("/{world}/costs")
