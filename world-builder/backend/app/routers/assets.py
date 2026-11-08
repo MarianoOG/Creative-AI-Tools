@@ -17,7 +17,7 @@ from typing import Annotated, Dict, List, Optional, Tuple
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from app.assets import library, story
+from app.assets import library, story, video
 from app.assets.generation import (
     ASPECT_RATIOS, DEFAULT_FINAL_PROVIDER, DEFAULT_PROVIDER, FINAL_PROVIDERS, PROVIDERS, generate_image,
 )
@@ -190,6 +190,13 @@ def options() -> Dict:
         "shot_types": story.SHOT_TYPES,
         "establishing_view": ESTABLISHING_VIEW,
         "default_world": DEFAULT_WORLD,
+        "video": {
+            "model": video.VIDEO_MODEL_NAME,
+            "resolution": video.VIDEO_RESOLUTION,
+            "usd_per_second": video.USD_PER_SECOND,
+            "durations": list(video.DURATIONS),
+            "default_duration": video.DEFAULT_DURATION,
+        },
     }
 
 

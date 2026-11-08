@@ -12,7 +12,9 @@ A shot's ``final`` is its frame, saved in its scene folder as
 ``{uuid8}-{shot}-final``; regenerating points it at a new file and leaves the
 old one on disk. ``image`` names an older storyboard preview, kept as it is;
 nothing renders one any more. ``final_provider`` is the model the last
-pass of the episode used (one of ``FINAL_PROVIDERS``).
+pass of the episode used (one of ``FINAL_PROVIDERS``). ``video`` is the shot's
+clip, animated from its final frame and saved beside it as
+``{uuid8}-{shot}-video.mp4``; regenerating it works the same way.
 
 A shot's ``id`` is its place in the scene (``shot1``, ``shot2``...), set on
 every read and save, so shots cannot be named. Removing one moves the later
@@ -28,7 +30,8 @@ script.json::
       "scenes": [{
         "id": "scene1", "heading": "INT. KITCHEN - DAY", "summary": "...",
         "characters": ["fox", "fox:older"], "locations": ["kitchen"], "objects": ["lantern"],
-        "shots": [{"id": "shot1", "type": "Wide shot", "action": "...", "image": "1a2b3c4d-shot1.png", "final": "5e6f7a8b-shot1-final.jpg"}]
+        "shots": [{"id": "shot1", "type": "Wide shot", "action": "...", "image": "1a2b3c4d-shot1.png", "final": "5e6f7a8b-shot1-final.jpg",
+                   "video": "9a8b7c6d-shot1-video.mp4"}]
       }]
     }
 
@@ -52,6 +55,9 @@ from app.assets.worlds import (
 from app.settings import relative
 
 SCRIPT_FILE = "script.json"
+
+#: A shot's file fields -> the key ``with_images`` gives each one's data-relative path.
+SHOT_FILES = {"image": "path", "final": "final_path", "video": "video_path"}
 
 #: The framings a shot can have, from the widest to the tightest.
 SHOT_TYPES = [
@@ -104,6 +110,7 @@ def _clean_shot(raw: Dict, folder: Path) -> Dict:
         "action": str(raw.get("action", "")),
         "image": Path(str(image)).name if image else None,
         "final": Path(str(raw["final"])).name if raw.get("final") else None,
+        "video": Path(str(raw["video"])).name if raw.get("video") else None,
     }
 
 
@@ -147,7 +154,7 @@ def save_script(world: str, episode: str, raw: Dict) -> Script:
     with _lock:
         current = read_script(world, episode)
         frames = {
-            (scene["id"], shot["id"]): {"image": shot["image"], "final": shot["final"]}
+            (scene["id"], shot["id"]): {field: shot[field] for field in SHOT_FILES}
             for scene in current["scenes"] for shot in scene["shots"]
         }
         raw = {
@@ -168,11 +175,11 @@ def save_script(world: str, episode: str, raw: Dict) -> Script:
 
 
 def with_images(world: str, episode: str, script: Script) -> Script:
-    """Give each shot the data-relative ``path`` of its image and ``final_path`` of its final, ``None`` if missing."""
+    """Give each shot the data-relative ``path`` of its image, ``final_path`` of its final and ``video_path`` of its video, ``None`` if missing."""
     for scene in script["scenes"]:
         folder = scene_dir(world, episode, scene["id"])
         for shot in scene["shots"]:
-            for field, key in (("image", "path"), ("final", "final_path")):
+            for field, key in SHOT_FILES.items():
                 path = folder / shot[field] if shot[field] else None
                 shot[key] = relative(path) if path and path.is_file() else None
     return script
@@ -180,7 +187,7 @@ def with_images(world: str, episode: str, script: Script) -> Script:
 
 def set_shot_image(world: str, episode: str, scene: str, shot: str, image: Path, field: str = "image",
                    final_provider: Optional[str] = None) -> Script:
-    """Point a shot's ``image`` (or ``final``) at a new file, and set the episode's ``final_provider`` if given.
+    """Point a shot's ``image`` (or ``final``, or ``video``) at a new file, and set the episode's ``final_provider`` if given.
 
     The previous file stays in the scene folder.
     """

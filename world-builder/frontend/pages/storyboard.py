@@ -8,43 +8,15 @@ regenerated; the old file stays on disk.
 
 from __future__ import annotations
 
-import io
-import zipfile
-from pathlib import Path
 from typing import Dict, List, Tuple
 
 import streamlit as st
 
 import api
 from shared.state import show_notice
-from shared.story import episode_url, generate_shots, pick_episode
+from shared.story import build_zip, episode_url, export_files, generate_shots, pick_episode, shots_in_order
 from shared.ui import grid
 from shared.worlds import render_world_switcher
-
-
-def shots_in_order(script: Dict) -> List[Tuple[Dict, Dict]]:
-    return [(scene, shot) for scene in script['scenes'] for shot in scene['shots']]
-
-
-@st.cache_data(show_spinner=False, max_entries=4)
-def build_zip(files: Tuple[Tuple[str, str], ...]) -> bytes:
-    """A zip of ``(name in the zip, data-relative path)`` pairs. Cached on the paths, which change with every render."""
-    buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_STORED) as archive:  # images are already compressed
-        for name, path in files:
-            archive.write(api.file_path(path), name)
-    return buffer.getvalue()
-
-
-def export_files(script: Dict) -> Tuple[Tuple[str, str], ...]:
-    """Every final frame, named in story order (``01_scene1_01_shot_1.png``) so the files sort as the episode runs."""
-    files = []
-    for scene_number, scene in enumerate(script['scenes'], start=1):
-        for shot_number, shot in enumerate(scene['shots'], start=1):
-            if shot.get('final_path'):
-                suffix = Path(shot['final_path']).suffix
-                files.append((f"{scene_number:02}_{scene['id']}_{shot_number:02}_{shot['id']}{suffix}", shot['final_path']))
-    return tuple(files)
 
 
 def render_grid(script: Dict) -> List[Tuple[str, str]]:
@@ -100,7 +72,7 @@ def main() -> None:
                 st.write(f"Render all {len(shots)} frames again? The current files stay on disk.")
                 regenerate_all = st.button("Regenerate all", icon=":material/refresh:", type="primary")
             export_col.download_button(
-                "Export all frames", data=build_zip(export_files(script)), file_name=f"{world}_{episode}.zip",
+                "Export all frames", data=build_zip(export_files(script, 'final_path')), file_name=f"{world}_{episode}.zip",
                 mime="application/zip", type="primary", icon=":material/download:", width='stretch',
             )
 

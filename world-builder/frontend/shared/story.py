@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import io
+import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import streamlit as st
@@ -21,9 +24,36 @@ def episode_url(world: str, episode: str) -> str:
     return f"/worlds/{world}/episodes/{episode}"
 
 
+def shots_in_order(script: Dict) -> List[Tuple[Dict, Dict]]:
+    return [(scene, shot) for scene in script['scenes'] for shot in scene['shots']]
+
+
+@st.cache_data(show_spinner=False, max_entries=4)
+def build_zip(files: Tuple[Tuple[str, str], ...]) -> bytes:
+    """A zip of ``(name in the zip, data-relative path)`` pairs. Cached on the paths, which change with every render."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_STORED) as archive:  # images and videos are already compressed
+        for name, path in files:
+            archive.write(api.file_path(path), name)
+    return buffer.getvalue()
+
+
+def export_files(script: Dict, key: str) -> Tuple[Tuple[str, str], ...]:
+    """Every shot's file under ``key`` (``final_path`` or ``video_path``), named in story order
+    (``01_scene1_01_shot1.png``) so the files sort as the episode runs."""
+    files = []
+    for scene_number, scene in enumerate(script['scenes'], start=1):
+        for shot_number, shot in enumerate(scene['shots'], start=1):
+            if shot.get(key):
+                suffix = Path(shot[key]).suffix
+                files.append((f"{scene_number:02}_{scene['id']}_{shot_number:02}_{shot['id']}{suffix}", shot[key]))
+    return tuple(files)
+
+
 def generate_shots(world: str, episode: str, shots: List[Tuple[str, str]], what: str,
-                   body: Optional[Dict] = None) -> None:
-    """Render each ``(scene, shot)`` frame, ``PARALLEL_RENDERS`` at a time, then leave a notice for the rerun.
+                   body: Optional[Dict] = None, action: str = "generate") -> None:
+    """Render each ``(scene, shot)`` with the shot's ``action`` endpoint (``generate`` for the
+    frame, ``video`` for the clip), ``PARALLEL_RENDERS`` at a time, then leave a notice for the rerun.
 
     Only the requests run in worker threads: Streamlit calls must stay on the
     script's own thread, so progress is written here as each render lands.
@@ -32,7 +62,7 @@ def generate_shots(world: str, episode: str, shots: List[Tuple[str, str]], what:
     with st.status(f"Generating {len(shots)} {what}(s), {PARALLEL_RENDERS} at a time... each can take a few minutes.") as status:
         with ThreadPoolExecutor(max_workers=PARALLEL_RENDERS) as pool:
             futures = {
-                pool.submit(api.post, f"{episode_url(world, episode)}/scenes/{scene_id}/shots/{shot_id}/generate", json=body):
+                pool.submit(api.post, f"{episode_url(world, episode)}/scenes/{scene_id}/shots/{shot_id}/{action}", json=body):
                     f"{scene_id}/{shot_id}"
                 for scene_id, shot_id in shots
             }

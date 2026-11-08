@@ -31,6 +31,7 @@ reference images it was made with.
 - `worlds.py`: creating, renaming and deleting worlds, and reading and writing their `world.json`.
 - `library.py`: assets, their variations and the preferred one, in `world.json`.
 - `story.py`: episodes, scenes, shots and `script.json`.
+- `video.py`: shot videos (Runware MiniMax H3 Fast) and their prompt.
 
 The HTTP API is in `app/routers/`. Keys (`OPENAI_API_KEY`, `GEMINI_API_KEY`) go
 in `backend/.env`.
@@ -116,7 +117,8 @@ scene entry without a folder is dropped on the next save.
       "id": "shot1",
       "action": "The fox walks down the wet street, lantern raised.",
       "image": "9c0d1e2f-shot1.png",
-      "final": "3a4b5c6d-shot1-final.jpg"
+      "final": "3a4b5c6d-shot1-final.jpg",
+      "video": "7e8f9a0b-shot1-video.mp4"
     }]
   }]
 }
@@ -125,7 +127,7 @@ scene entry without a folder is dropped on the next save.
 `characters`, `locations` and `objects` hold references: `name` for an asset's
 preferred image, `name:variation` for a specific one (`fox_hero:older`,
 `night_market:night`). A shot's `final` is its frame in the
-scene folder. Its `image` names an older storyboard preview, kept as it is
+scene folder, and `video` its clip. Its `image` names an older storyboard preview, kept as it is
 (nothing renders one any more; scripts from before it get the newest file
 named after the shot); `final_provider` is the model the
 episode's last one used. A shot's `id` is its place in the scene (`shot1`,
@@ -153,3 +155,12 @@ wait for the render and return the result. Each image is rendered by one
   location and object the scene lists (as designs to reproduce, which with the
   world's style decide the look), plus their descriptions and the shot's text.
   Regenerating points `final` at the new image.
+- **shot videos**: `POST /worlds/{world}/episodes/{episode}/scenes/{scene}/shots/{shot}/video`,
+  with `{"duration": 6}` (seconds: 5, 6, 8, 10 or 15), animates the shot's final frame with Runware's
+  MiniMax H3 Fast (`minimax:h3@fast`) at 768p. The frame is sent as the first frame; the prompt is
+  the shot's text (as for its final frame), the world's style, and a direction to keep the frame's
+  designs and style and to have no dialogue or voices. The task runs async and is polled until done
+  (up to 9 minutes). It refuses a shot with no final frame. The clip is saved as
+  `{uuid8}-{shot}-video.mp4` beside the frame, and its billed cost is logged (the list price,
+  $0.08/s, marked estimated, if Runware reports none). Regenerating a frame leaves the old clip
+  in place until the video is regenerated too.
