@@ -1,7 +1,8 @@
 """Script: the whole episode, scene by scene and shot by shot, all editable in place.
 
 The script is text only: nothing is generated here. The frames are made on the
-Storyboard page.
+Storyboard page, and the videos (with each shot's camera move and clip
+length, set here) on the Video page.
 
 Every change (save, add, remove, delete) first collects what is typed
 anywhere on the page and saves the whole episode, so no unsaved edit is lost.
@@ -42,13 +43,24 @@ def action_height(text: str) -> int:
     return min(400, max(68, 24 * lines + 20))
 
 
-def render_shot(shot: Dict, prefix: str, shot_types: List[str]) -> Dict[str, bool]:
-    """One shot: its number, type and action, with a remove button."""
-    id_col, type_col, remove_col = st.columns([1, 3, 0.4], vertical_alignment='center')
+def render_shot(shot: Dict, prefix: str, shot_types: List[str], video: Dict) -> Dict[str, bool]:
+    """One shot: its number, type, camera move, clip length and action, with a remove button."""
+    id_col, type_col, camera_col, length_col, remove_col = st.columns(
+        [1, 3, 2, 1.2, 0.4], vertical_alignment='center'
+    )
     id_col.markdown(f"**{shot['id']}**")
     type_col.selectbox(
         "Shot type", shot_types, index=shot_types.index(shot['type']) if shot['type'] in shot_types else None,
         placeholder="Shot type", label_visibility='collapsed', key=shot_key(prefix, shot, 'type'),
+    )
+    camera_col.selectbox(
+        "Camera", video['camera_moves'], index=video['camera_moves'].index(shot['camera']),
+        label_visibility='collapsed', key=shot_key(prefix, shot, 'camera'), help="The video's camera move",
+    )
+    length_col.selectbox(
+        "Clip length", video['durations'], index=video['durations'].index(shot['duration']),
+        format_func=lambda seconds: f"{seconds} s", label_visibility='collapsed',
+        key=shot_key(prefix, shot, 'duration'), help="The video's length",
     )
     removed = remove_col.button(
         "", icon=":material/delete:", help="Remove the shot", key=shot_key(prefix, shot, 'remove'), width='stretch'
@@ -60,7 +72,8 @@ def render_shot(shot: Dict, prefix: str, shot_types: List[str]) -> Dict[str, boo
     return {'remove': removed}
 
 
-def render_scene(scene: Dict, number: int, prefix: str, names: Dict, shot_types: List[str]) -> Tuple[Dict, Dict]:
+def render_scene(scene: Dict, number: int, prefix: str, names: Dict, shot_types: List[str],
+                 video: Dict) -> Tuple[Dict, Dict]:
     """A scene's heading, summary, references and shots, all as fields. Returns the scene as typed, and what was clicked."""
     title_col, delete_col = st.columns([4, 1], vertical_alignment='center')
     title_col.subheader(f"Scene {number} · `{scene['id']}`")
@@ -71,17 +84,18 @@ def render_scene(scene: Dict, number: int, prefix: str, names: Dict, shot_types:
 
     st.markdown("**Shots**")
     shots = {
-        shot['id']: render_shot(shot, prefix, shot_types) for shot in scene['shots']
+        shot['id']: render_shot(shot, prefix, shot_types, video) for shot in scene['shots']
     }
     add_clicked = st.button("Add shot", icon=":material/add:", key=f"{prefix}add")
     return edited, {'shots': shots, 'add': add_clicked, 'delete': delete_clicked}
 
 
 def collect(edited: Dict, prefix: str) -> Dict:
-    """The scene as currently typed: ``edited`` scene fields plus every shot's type and action."""
+    """The scene as currently typed: ``edited`` scene fields plus every shot's type, action, camera and length."""
     state = st.session_state
     shots = [
-        {'id': shot['id'], 'type': state[shot_key(prefix, shot, 'type')], 'action': state[shot_key(prefix, shot, 'action')]}
+        {'id': shot['id'], **{field: state[shot_key(prefix, shot, field)]
+                              for field in ('type', 'action', 'camera', 'duration')}}
         for shot in edited['shots']
     ]
     return {**edited, 'shots': shots}
@@ -111,7 +125,7 @@ def main() -> None:
     for number, scene in enumerate(script['scenes'], start=1):
         st.divider()
         prefix = f"sc_{world}_{episode}_{st.session_state.script_revision}_{scene['id']}_"
-        edited, actions = render_scene(scene, number, prefix, names, shot_types)
+        edited, actions = render_scene(scene, number, prefix, names, shot_types, options['video'])
         scenes.append((scene['id'], prefix, edited, actions))
     st.divider()
     new_scene, new_scene_clicked = render_new_scene(len(script['scenes']))

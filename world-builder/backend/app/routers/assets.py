@@ -196,6 +196,8 @@ def options() -> Dict:
             "usd_per_second": video.USD_PER_SECOND,
             "durations": list(video.DURATIONS),
             "default_duration": video.DEFAULT_DURATION,
+            "camera_moves": list(video.CAMERA_MOVES),
+            "default_camera": video.DEFAULT_CAMERA,
         },
     }
 

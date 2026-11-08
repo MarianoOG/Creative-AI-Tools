@@ -32,9 +32,22 @@ VIDEO_RESOLUTION = "768p"
 #: Runware's list price for H3 Fast at 768p (checked 2026-11-08). Only used for the price
 #: shown before a render and when Runware reports no cost; the logged figure is the billed one.
 USD_PER_SECOND = 0.08
-#: Clip lengths offered (H3 Fast renders 5 to 15 seconds).
+#: Clip lengths offered (H3 Fast renders 5 to 15 seconds); a shot starts at the shortest.
 DURATIONS = (5, 6, 8, 10, 15)
-DEFAULT_DURATION = 6
+DEFAULT_DURATION = DURATIONS[0]
+
+#: The camera moves a shot's video can have -> how the prompt says it. Basic on purpose.
+CAMERA_MOVES = {
+    "Static": "Static camera: locked off, no camera movement at all.",
+    "Pan left": "The camera pans slowly to the left from a fixed position.",
+    "Pan right": "The camera pans slowly to the right from a fixed position.",
+    "Tilt up": "The camera tilts slowly up from a fixed position.",
+    "Tilt down": "The camera tilts slowly down from a fixed position.",
+    "Push in": "The camera pushes in slowly toward the subject.",
+    "Pull out": "The camera pulls out slowly away from the subject.",
+    "Tracking": "The camera tracks alongside the subject, keeping it in frame as it moves.",
+}
+DEFAULT_CAMERA = "Static"
 
 #: The frame is sent at about the output size: a 2K still would only add upload time.
 _FRAME_MAX_SIDE = 1366
@@ -47,18 +60,22 @@ VIDEO_DIRECTION = (
     "Animate the attached image as the first frame of this shot. It is fact, not inspiration: keep its "
     "characters, their designs and costumes, the location, the composition and the art style exactly, and "
     "keep that style consistent in every frame. Move only what the shot describes, with natural, readable "
-    "motion and a steady camera unless the shot asks for camera movement. Do not cut to another shot. "
+    "motion, and move the camera only as the camera line says. Do not cut to another shot. "
     "Sound: no dialogue, no voices, no narration, no singing and no lip-sync; ambient sound and effects only."
 )
 
 
-def build_video_prompt(description: str, style: str) -> str:
-    """The prompt for one shot video: what happens, the world's style, then how to animate the frame."""
+def build_video_prompt(description: str, style: str, camera: str = DEFAULT_CAMERA) -> str:
+    """The prompt for one shot video: what happens, the camera move, the world's style, then how to animate the frame."""
     if not style.strip():
         raise ValueError("this world has no style yet - write one in Manage worlds")
     if not description.strip():
         raise ValueError("description must not be empty")
-    return "\n\n".join([description.strip(), f"Style: {style.strip()}", VIDEO_DIRECTION])
+    if camera not in CAMERA_MOVES:
+        raise ValueError(f"camera must be one of {list(CAMERA_MOVES)}")
+    return "\n\n".join(
+        [description.strip(), f"Camera: {CAMERA_MOVES[camera]}", f"Style: {style.strip()}", VIDEO_DIRECTION]
+    )
 
 
 def price(duration: int) -> float:
@@ -141,14 +158,14 @@ def _runware_video(prompt: str, frame: Path, duration: int) -> Tuple[bytes, Opti
 
 
 def generate_video(world: str, label: str, description: str, style: str, frame: Path, directory: Path,
-                   duration: int = DEFAULT_DURATION) -> Path:
+                   duration: int = DEFAULT_DURATION, camera: str = DEFAULT_CAMERA) -> Path:
     """Render one shot video from its final ``frame`` and save it as ``{uuid8}-{label}.mp4`` in ``directory``.
 
     Raises if Runware fails; nothing is written then. What it billed is appended to ``world``'s cost log.
     """
     if duration not in DURATIONS:
         raise ValueError(f"duration must be one of {list(DURATIONS)} seconds")
-    prompt = build_video_prompt(description, style)
+    prompt = build_video_prompt(description, style, camera)
     data, cost = _runware_video(prompt, frame, duration)
     path = directory / f"{uuid.uuid4().hex[:8]}-{label}.mp4"
     directory.mkdir(parents=True, exist_ok=True)

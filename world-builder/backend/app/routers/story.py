@@ -26,11 +26,6 @@ class NewEpisode(BaseModel):
     aspect_ratio: str = "landscape"
 
 
-class ShotVideo(BaseModel):
-    #: Seconds, one of ``video.DURATIONS``.
-    duration: int = video.DEFAULT_DURATION
-
-
 class FinalFrame(BaseModel):
     #: The final frame's model (``openai``, ``gemini`` or ``runware``); the episode's last one when left out.
     provider: Optional[str] = None
@@ -188,17 +183,15 @@ def generate_shot(world: str, episode: str, scene: str, shot: str, body: Optiona
 
 
 @router.post("/{episode}/scenes/{scene}/shots/{shot}/video")
-def generate_shot_video(world: str, episode: str, scene: str, shot: str, body: Optional[ShotVideo] = None) -> Dict:
+def generate_shot_video(world: str, episode: str, scene: str, shot: str) -> Dict:
     """Render a shot's video from its final frame, replacing the one it had (whose file stays on disk).
 
-    It uses Runware's MiniMax H3 Fast at 768p, starting from the shot's final
-    frame and prompted with the world's style and the shot's text (the
-    scene's heading, summary and cast, and the shot's action). No dialogue or voices.
+    It uses Runware's MiniMax H3 Fast at 768p for the shot's ``duration``, starting
+    from the shot's final frame and prompted with the shot's text (the scene's
+    heading, summary and cast, and the shot's type and action), its ``camera``
+    move and the world's style. No dialogue or voices.
     """
-    body = body or ShotVideo()
     check_world(world)
-    if body.duration not in video.DURATIONS:
-        raise HTTPException(422, f"duration must be one of {list(video.DURATIONS)} seconds")
     script = story.with_images(world, episode, call(story.read_script, world, episode))
     scene_data, shot_data = _find_shot(script, scene, shot)
     if not shot_data["final_path"]:
@@ -213,6 +206,7 @@ def generate_shot_video(world: str, episode: str, scene: str, shot: str, body: O
     folder = story.scene_dir(world, episode, scene)
     with provider_errors("runware"):
         path = video.generate_video(
-            world, f"{shot}-video", description, style, folder / shot_data["final"], folder, body.duration
+            world, f"{shot}-video", description, style, folder / shot_data["final"], folder,
+            duration=shot_data["duration"], camera=shot_data["camera"],
         )
     return story.with_images(world, episode, story.set_shot_image(world, episode, scene, shot, path, "video"))

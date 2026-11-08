@@ -118,7 +118,9 @@ scene entry without a folder is dropped on the next save.
       "action": "The fox walks down the wet street, lantern raised.",
       "image": "9c0d1e2f-shot1.png",
       "final": "3a4b5c6d-shot1-final.jpg",
-      "video": "7e8f9a0b-shot1-video.mp4"
+      "video": "7e8f9a0b-shot1-video.mp4",
+      "duration": 5,
+      "camera": "Static"
     }]
   }]
 }
@@ -127,7 +129,10 @@ scene entry without a folder is dropped on the next save.
 `characters`, `locations` and `objects` hold references: `name` for an asset's
 preferred image, `name:variation` for a specific one (`fox_hero:older`,
 `night_market:night`). A shot's `final` is its frame in the
-scene folder, and `video` its clip. Its `image` names an older storyboard preview, kept as it is
+scene folder, and `video` its clip; `duration` (seconds: 5, 6, 8, 10 or 15, 5 by default)
+and `camera` (`Static` by default, or `Pan left`, `Pan right`, `Tilt up`, `Tilt down`,
+`Push in`, `Pull out`, `Tracking`) are the clip's length and camera move. A save that
+leaves out a shot's files, `duration` or `camera` keeps what is on disk. Its `image` names an older storyboard preview, kept as it is
 (nothing renders one any more; scripts from before it get the newest file
 named after the shot); `final_provider` is the model the
 episode's last one used. A shot's `id` is its place in the scene (`shot1`,
@@ -155,11 +160,11 @@ wait for the render and return the result. Each image is rendered by one
   location and object the scene lists (as designs to reproduce, which with the
   world's style decide the look), plus their descriptions and the shot's text.
   Regenerating points `final` at the new image.
-- **shot videos**: `POST /worlds/{world}/episodes/{episode}/scenes/{scene}/shots/{shot}/video`,
-  with `{"duration": 6}` (seconds: 5, 6, 8, 10 or 15), animates the shot's final frame with Runware's
-  MiniMax H3 Fast (`minimax:h3@fast`) at 768p. The frame is sent as the first frame; the prompt is
-  the shot's text (as for its final frame), the world's style, and a direction to keep the frame's
-  designs and style and to have no dialogue or voices. The task runs async and is polled until done
+- **shot videos**: `POST /worlds/{world}/episodes/{episode}/scenes/{scene}/shots/{shot}/video`
+  animates the shot's final frame with Runware's MiniMax H3 Fast (`minimax:h3@fast`) at 768p, for the
+  shot's `duration`. The frame is sent as the first frame; the prompt is the shot's text (as for its
+  final frame, so its type leads its action), its `camera` move, the world's style, and a direction
+  to keep the frame's designs and style and to have no dialogue or voices. The task runs async and is polled until done
   (up to 9 minutes). It refuses a shot with no final frame. The clip is saved as
   `{uuid8}-{shot}-video.mp4` beside the frame, and its billed cost is logged (the list price,
   $0.08/s, marked estimated, if Runware reports none). Regenerating a frame leaves the old clip

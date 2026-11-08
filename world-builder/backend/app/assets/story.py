@@ -14,7 +14,10 @@ old one on disk. ``image`` names an older storyboard preview, kept as it is;
 nothing renders one any more. ``final_provider`` is the model the last
 pass of the episode used (one of ``FINAL_PROVIDERS``). ``video`` is the shot's
 clip, animated from its final frame and saved beside it as
-``{uuid8}-{shot}-video.mp4``; regenerating it works the same way.
+``{uuid8}-{shot}-video.mp4``; regenerating it works the same way. Its
+``duration`` (seconds, one of ``video.DURATIONS``, the shortest by default)
+and ``camera`` (one of ``video.CAMERA_MOVES``, ``Static`` by default) are
+the clip's length and camera move.
 
 A shot's ``id`` is its place in the scene (``shot1``, ``shot2``...), set on
 every read and save, so shots cannot be named. Removing one moves the later
@@ -31,7 +34,7 @@ script.json::
         "id": "scene1", "heading": "INT. KITCHEN - DAY", "summary": "...",
         "characters": ["fox", "fox:older"], "locations": ["kitchen"], "objects": ["lantern"],
         "shots": [{"id": "shot1", "type": "Wide shot", "action": "...", "image": "1a2b3c4d-shot1.png", "final": "5e6f7a8b-shot1-final.jpg",
-                   "video": "9a8b7c6d-shot1-video.mp4"}]
+                   "video": "9a8b7c6d-shot1-video.mp4", "duration": 5, "camera": "Static"}]
       }]
     }
 
@@ -48,6 +51,7 @@ from typing import Any, Dict, List, Optional
 
 from app.assets.generation import ASPECT_RATIOS, DEFAULT_FINAL_PROVIDER, FINAL_PROVIDERS
 from app.assets.prompt_manager import ASSET_DIRS
+from app.assets.video import CAMERA_MOVES, DEFAULT_CAMERA, DEFAULT_DURATION, DURATIONS
 from app.assets.worlds import (
     child_dir, existing_dir, images_in, legacy_name, move_to_deleted, new_child_dir, slugify, subfolders, world_dir,
     write_json,
@@ -58,6 +62,8 @@ SCRIPT_FILE = "script.json"
 
 #: A shot's file fields -> the key ``with_images`` gives each one's data-relative path.
 SHOT_FILES = {"image": "path", "final": "final_path", "video": "video_path"}
+#: A shot's video settings. Like its files, a save that leaves them out keeps what is on disk.
+SHOT_VIDEO_SETTINGS = ("duration", "camera")
 
 #: The framings a shot can have, from the widest to the tightest.
 SHOT_TYPES = [
@@ -111,6 +117,8 @@ def _clean_shot(raw: Dict, folder: Path) -> Dict:
         "image": Path(str(image)).name if image else None,
         "final": Path(str(raw["final"])).name if raw.get("final") else None,
         "video": Path(str(raw["video"])).name if raw.get("video") else None,
+        "duration": raw.get("duration") if raw.get("duration") in DURATIONS else DEFAULT_DURATION,
+        "camera": raw.get("camera") if raw.get("camera") in CAMERA_MOVES else DEFAULT_CAMERA,
     }
 
 
@@ -154,7 +162,7 @@ def save_script(world: str, episode: str, raw: Dict) -> Script:
     with _lock:
         current = read_script(world, episode)
         frames = {
-            (scene["id"], shot["id"]): {field: shot[field] for field in SHOT_FILES}
+            (scene["id"], shot["id"]): {field: shot[field] for field in (*SHOT_FILES, *SHOT_VIDEO_SETTINGS)}
             for scene in current["scenes"] for shot in scene["shots"]
         }
         raw = {
