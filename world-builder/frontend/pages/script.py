@@ -1,11 +1,12 @@
-"""Script: the whole episode, scene by scene and shot by shot, all editable in place.
+"""Script: the whole episode, scene by scene and shot by shot, all editable in place, saved as you go.
 
 The script is text only: nothing is generated here. Each shot here is just
 its action. Its type is set, and its frame made, on the Storyboard page; its
 camera move and clip length are set, and its video made, on the Video page.
 
-Every change (save, add, remove, delete) first collects what is typed
-anywhere on the page and saves the whole episode, so no unsaved edit is lost.
+Every field saves the whole episode as soon as it changes (a text field when
+you leave it), so there is no Save button. Adding, removing and deleting also
+save everything typed first, so no edit is lost.
 """
 
 from __future__ import annotations
@@ -17,24 +18,64 @@ import streamlit as st
 
 import api
 from shared.state import notify, show_notice
-from shared.story import asset_names, episode_url, pick_episode, scene_fields
+from shared.story import REFERENCE_FIELDS, asset_names, episode_url, pick_episode, scene_fields
 from shared.ui import show_errors
 from shared.worlds import render_world_switcher
 
 
-def render_header(episode: str, script: Dict, ratios: List[str]) -> Dict:
-    """The episode's title, synopsis and aspect ratio as fields. Returns them as typed."""
-    title = st.text_input("Title", value=script['title'], key=f"title_{episode}")
-    synopsis = st.text_area("Synopsis", value=script['synopsis'], height=90, key=f"synopsis_{episode}")
-    aspect_ratio = st.selectbox(
-        "Aspect ratio", ratios, index=ratios.index(script['aspect_ratio']), key=f"ratio_{episode}",
-        help="Every frame of the episode uses this aspect ratio.",
-    )
-    return {'title': title, 'synopsis': synopsis, 'aspect_ratio': aspect_ratio}
+def scene_prefix(world: str, episode: str, scene_id: str) -> str:
+    """Widget keys of a scene. They carry ``script_revision``, so every field reloads after shots are renumbered."""
+    return f"sc_{world}_{episode}_{st.session_state.script_revision}_{scene_id}_"
 
 
 def shot_key(prefix: str, shot: Dict, field: str) -> str:
     return f"{prefix}{shot['id']}_{field}"
+
+
+def typed_script(world: str, episode: str, script: Dict) -> Dict:
+    """The episode as currently typed on the page: the loaded ``script`` with every field's value.
+
+    A shot is sent as its id and action only, so its type, camera move, length and files stay as saved.
+    """
+    state = st.session_state
+    scenes = []
+    for scene in script['scenes']:
+        prefix = scene_prefix(world, episode, scene['id'])
+        scenes.append({
+            **scene,
+            'heading': state.get(f"{prefix}heading", scene['heading']),
+            'summary': state.get(f"{prefix}summary", scene['summary']),
+            **{field: state.get(f"{prefix}{field}", scene[field]) for field in REFERENCE_FIELDS},
+            'shots': [
+                {'id': shot['id'], 'action': state.get(shot_key(prefix, shot, 'action'), shot['action'])}
+                for shot in scene['shots']
+            ],
+        })
+    return {
+        **script,
+        'title': state.get(f"title_{episode}", script['title']),
+        'synopsis': state.get(f"synopsis_{episode}", script['synopsis']),
+        'aspect_ratio': state.get(f"ratio_{episode}", script['aspect_ratio']),
+        'scenes': scenes,
+    }
+
+
+def save_typed(world: str, episode: str, script: Dict) -> None:
+    """Every field's on_change: save the whole episode as typed. The fields keep their keys, so nothing reloads."""
+    try:
+        api.put(episode_url(world, episode), json=typed_script(world, episode, script))
+    except api.ApiError as exc:
+        st.session_state.notice = ('error', f"Could not save the script: {exc}")
+
+
+def render_header(episode: str, script: Dict, ratios: List[str], save: Dict) -> None:
+    """The episode's title, synopsis and aspect ratio as fields, each saved as soon as it changes."""
+    st.text_input("Title", value=script['title'], key=f"title_{episode}", **save)
+    st.text_area("Synopsis", value=script['synopsis'], height=90, key=f"synopsis_{episode}", **save)
+    st.selectbox(
+        "Aspect ratio", ratios, index=ratios.index(script['aspect_ratio']), key=f"ratio_{episode}",
+        help="Every frame of the episode uses this aspect ratio.", **save,
+    )
 
 
 def action_height(text: str) -> int:
@@ -43,14 +84,14 @@ def action_height(text: str) -> int:
     return min(400, max(68, 24 * lines + 20))
 
 
-def render_shot(shot: Dict, prefix: str) -> Dict[str, bool]:
+def render_shot(shot: Dict, prefix: str, save: Dict) -> Dict[str, bool]:
     """One shot: its number, its action and a remove button. Its type is set on the Storyboard, and its
     video's camera move and length on the Video page."""
     id_col, action_col, remove_col = st.columns([1, 10, 0.6], vertical_alignment='top')
     id_col.markdown(f"**{shot['id']}**")
     action_col.text_area(
         "Action", value=shot['action'], height=action_height(shot['action']),
-        label_visibility='collapsed', placeholder="What happens in this shot", key=shot_key(prefix, shot, 'action'),
+        label_visibility='collapsed', placeholder="What happens in this shot", key=shot_key(prefix, shot, 'action'), **save,
     )
     removed = remove_col.button(
         "", icon=":material/delete:", help="Remove the shot", key=shot_key(prefix, shot, 'remove'), width='stretch'
@@ -58,31 +99,22 @@ def render_shot(shot: Dict, prefix: str) -> Dict[str, bool]:
     return {'remove': removed}
 
 
-def render_scene(scene: Dict, number: int, prefix: str, names: Dict) -> Tuple[Dict, Dict]:
-    """A scene's heading, summary, references and shots, all as fields. Returns the scene as typed, and what was clicked."""
+def render_scene(scene: Dict, number: int, prefix: str, names: Dict, save: Dict) -> Dict:
+    """A scene's heading, summary, references and shots, all as fields saved as soon as they change.
+    Returns what was clicked."""
     title_col, delete_col = st.columns([4, 1], vertical_alignment='center')
     title_col.subheader(f"Scene {number} · `{scene['id']}`")
     with delete_col.popover("Delete", width='stretch'):
         st.warning(f"All {len(scene['shots'])} shots of **{scene['id']}** will be removed from the script (the folder is kept, hidden).")
         delete_clicked = st.button("Delete scene", icon=":material/delete:", key=f"{prefix}delete")
-    edited = scene_fields(scene, names, prefix)
+    scene_fields(scene, names, prefix, **save)
 
     st.markdown("**Shots**")
     shots = {
-        shot['id']: render_shot(shot, prefix) for shot in scene['shots']
+        shot['id']: render_shot(shot, prefix, save) for shot in scene['shots']
     }
     add_clicked = st.button("Add shot", icon=":material/add:", key=f"{prefix}add")
-    return edited, {'shots': shots, 'add': add_clicked, 'delete': delete_clicked}
-
-
-def collect(edited: Dict, prefix: str) -> Dict:
-    """The scene as currently typed: ``edited`` scene fields plus every shot's action.
-
-    A shot's type, camera move and length are left out, so the save keeps what is on disk.
-    """
-    state = st.session_state
-    shots = [{'id': shot['id'], 'action': state[shot_key(prefix, shot, 'action')]} for shot in edited['shots']]
-    return {**edited, 'shots': shots}
+    return {'shots': shots, 'add': add_clicked, 'delete': delete_clicked}
 
 
 def render_new_scene(count: int) -> Tuple[str, bool]:
@@ -99,41 +131,39 @@ def main() -> None:
         return
     script = api.get(episode_url(world, episode))
     options = api.options()
-    save_clicked = st.sidebar.button("Save script", type="primary", width='stretch')
+    st.sidebar.caption("Every change saves on its own (a text field when you leave it).")
     show_notice()
-    header = render_header(episode, script, options['aspect_ratios'])
+    save = {'on_change': save_typed, 'args': (world, episode, script)}
+    render_header(episode, script, options['aspect_ratios'], save)
 
     names = asset_names(world)
-    scenes = []
+    actions = {}
     for number, scene in enumerate(script['scenes'], start=1):
         st.divider()
-        prefix = f"sc_{world}_{episode}_{st.session_state.script_revision}_{scene['id']}_"
-        edited, actions = render_scene(scene, number, prefix, names)
-        scenes.append((scene['id'], prefix, edited, actions))
+        actions[scene['id']] = render_scene(scene, number, scene_prefix(world, episode, scene['id']), names, save)
     st.divider()
     new_scene, new_scene_clicked = render_new_scene(len(script['scenes']))
 
-    # Act once every widget is drawn, so ``collect`` sees all of them.
+    # Act once every widget is drawn, so ``typed_script`` sees all of them.
+    typed = typed_script(world, episode, script)
     deleted = None
-    changed = save_clicked or new_scene_clicked
-    edited_scenes = []
-    for scene_id, prefix, edited, actions in scenes:
-        edited = collect(edited, prefix)
-        removed = [shot_id for shot_id, clicked in actions['shots'].items() if clicked['remove']]
+    changed = new_scene_clicked
+    for scene in typed['scenes']:
+        clicked = actions[scene['id']]
+        removed = [shot_id for shot_id, shot_clicks in clicked['shots'].items() if shot_clicks['remove']]
         if removed:
-            edited['shots'] = [shot for shot in edited['shots'] if shot['id'] not in removed]
-        if actions['add']:
+            scene['shots'] = [shot for shot in scene['shots'] if shot['id'] not in removed]
+        if clicked['add']:
             # The backend numbers it; an id no shot has keeps it from taking another shot's frames.
-            edited['shots'].append({'id': "new", 'action': ""})
-        if actions['delete']:
-            deleted = scene_id
-        changed = changed or bool(removed) or actions['add'] or actions['delete']
-        edited_scenes.append(edited)
+            scene['shots'].append({'id': "new", 'action': ""})
+        if clicked['delete']:
+            deleted = scene['id']
+        changed = changed or bool(removed) or clicked['add'] or clicked['delete']
 
     if not changed:
         return
     with show_errors():
-        api.put(episode_url(world, episode), json={**script, **header, 'scenes': edited_scenes})
+        api.put(episode_url(world, episode), json=typed)
         # Shots are renumbered on save: new widget keys make every field reload from the saved script.
         st.session_state.script_revision += 1
         if deleted:
@@ -143,7 +173,7 @@ def main() -> None:
             created = api.post(f"{episode_url(world, episode)}/scenes", json={'name': new_scene})
             notify('success', f"Added **{created['name']}**.")
         else:
-            notify('success', "Script saved.")
+            st.rerun()
 
 
 main()
