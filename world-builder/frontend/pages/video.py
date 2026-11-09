@@ -151,7 +151,8 @@ def main() -> None:
                 type="primary", width='stretch',
                 help="Every shot with a frame but no video, plus every video older than its frame.",
             )
-        if with_video:
+        elif len(framed) == len(shots):
+            # Like the Storyboard: export only once every shot has a video that matches its frame.
             # No "regenerate all": re-rendering every clip at once is too expensive to offer. One at a time only.
             st.download_button(
                 "Export all videos", data=build_zip(export_files(script, 'video_path')),
