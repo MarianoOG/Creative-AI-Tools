@@ -56,7 +56,7 @@ data/assets/
 
 New files are named `{uuid8}-{name}-{variation}` (final frames: `{uuid8}-{shot}-final`). Every
 render gets a new uuid, so nothing is overwritten. OpenAI writes PNG and Gemini
-JPEG; output is 2K.
+JPEG; assets are 2K, final frames 1K (the size of the 768p video).
 
 The JSON files decide what exists: an image in a folder that no `world.json` or
 `script.json` entry points at is an orphan and is never shown. Removing an
@@ -156,7 +156,8 @@ wait for the render and return the result. Each image is rendered by one
   ones already made are kept and the failure comes back as a `warning`.
 - **final frames**: the shot endpoint, with `{"provider": "openai" | "gemini" | "runware"}`
   (the episode's last one when left out), renders the shot's finished, fully
-  detailed frame at high quality and 2K in the episode's aspect ratio. It is sent the image of every character,
+  detailed frame at 1K (1360×768 landscape, the size of the 768p video it becomes) in the episode's
+  aspect ratio, with OpenAI at medium quality. It is sent the image of every character,
   location and object the scene lists (as designs to reproduce, which with the
   world's style decide the look), plus their descriptions and the shot's text.
   Regenerating points `final` at the new image.

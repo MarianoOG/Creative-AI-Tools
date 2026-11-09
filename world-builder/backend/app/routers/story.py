@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.assets import library, story, video
-from app.assets.generation import FINAL_PROVIDERS, generate_image
+from app.assets.generation import FINAL_PROVIDERS, FINAL_QUALITY, FINAL_RESOLUTION, generate_image
 from app.assets.prompt_manager import ASSET_DIRS
 from app.assets.worlds import read_style, read_world
 from app.routers.common import call, check_world, provider_errors
@@ -140,7 +140,7 @@ def _find_shot(script: Dict, scene: str, shot: str) -> tuple[Dict, Dict]:
 def generate_shot(world: str, episode: str, scene: str, shot: str, body: Optional[FinalFrame] = None) -> Dict:
     """Render a shot's final frame, replacing the one it had (whose file stays on disk).
 
-    It uses OpenAI, Gemini or Runware (Flux 2 Klein) at high quality and full size, in the episode's
+    It uses OpenAI (medium quality), Gemini or Runware (Flux 2 Klein) at 1K, the size of the video, in the episode's
     aspect ratio and the world's style. It is sent the image of every
     character, location and object the scene lists, as well as their
     descriptions and the shot's text.
@@ -177,7 +177,8 @@ def generate_shot(world: str, episode: str, scene: str, shot: str, body: Optiona
             references=references,
             clause="final",
             aspect_ratio=script["aspect_ratio"],
-            quality="high",
+            quality=FINAL_QUALITY,
+            resolution=FINAL_RESOLUTION,
         )
     return story.with_images(world, episode, story.set_shot_image(world, episode, scene, shot, path, "final", provider))
 

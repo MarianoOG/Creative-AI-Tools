@@ -2,8 +2,11 @@
 
 Files are written to the folder the caller passes (an asset-type folder, or a
 scene folder for shots) as ``{uuid8}-{label}``, with the extension of the
-returned bytes (OpenAI PNG, Gemini and Runware JPEG). Everything renders at
-2K. Every render gets a new uuid, so nothing is ever overwritten.
+returned bytes (OpenAI PNG, Gemini and Runware JPEG). Characters, objects and
+locations render at 2K and high quality: they are made once and every frame is
+built from them. Final frames render at 1K (the size of the 768p video they
+become) with OpenAI at medium quality. Every render gets a new uuid, so nothing
+is ever overwritten.
 """
 
 from __future__ import annotations
@@ -33,9 +36,9 @@ PROVIDERS = {
     "runware": "Runware Flux 2 Klein 4B (~$0.015/image)",
 }
 DEFAULT_PROVIDER = "openai"
-#: Rough USD per 2K high-quality image, shown before a render until the world's cost log has real ones.
+#: Rough USD per final frame (1K), shown on the Storyboard until the world's cost log has real ones.
 #: OpenAI bills per token, so it has no fixed figure.
-PRICE_ESTIMATES = {"openai": None, "gemini": 0.05, "runware": 0.015}
+PRICE_ESTIMATES = {"openai": None, "gemini": 0.034, "runware": 0.007}
 #: The models a final frame can use (all of them), and the default one.
 FINAL_PROVIDERS = tuple(PROVIDERS)
 DEFAULT_FINAL_PROVIDER = "gemini"
@@ -43,8 +46,12 @@ DEFAULT_FINAL_PROVIDER = "gemini"
 #: Friendly name -> the ratio Gemini takes.
 ASPECT_RATIOS = {"landscape": "16:9", "square": "1:1", "portrait": "9:16"}
 
-#: Ratio -> the 2K (width, height) OpenAI and Runware render (both sides divisible by 16).
-SIZES = {"16:9": (2048, 1152), "1:1": (2048, 2048), "9:16": (1152, 2048)}
+#: Resolution -> ratio -> the (width, height) OpenAI and Runware render (both sides divisible by 16).
+#: Gemini takes the resolution name itself. 1K matches the 768p video a final frame becomes.
+SIZES = {
+    "2K": {"16:9": (2048, 1152), "1:1": (2048, 2048), "9:16": (1152, 2048)},
+    "1K": {"16:9": (1360, 768), "1:1": (1024, 1024), "9:16": (768, 1360)},
+}
 
 #: Provider -> the most reference images it takes (the API limits).
 MAX_REFERENCES = {"runware": 4, "openai": 16, "gemini": 14}
@@ -56,12 +63,18 @@ QUALITY: dict[str, tuple[str, Optional[str]]] = {
     "low": ("low", None),
     "medium": ("medium", None),
     "high": ("high", "high"),
+    # Final frames: OpenAI at medium (enough for a 768p video, and much cheaper), Gemini unchanged.
+    "frame": ("medium", "high"),
 }
 
 #: Characters, objects and locations are always rendered like this; final
 #: frames take their ratio from the episode, at high quality.
 ASSET_ASPECT_RATIO = "landscape"
 ASSET_QUALITY = "high"
+ASSET_RESOLUTION = "2K"
+#: Final frames only feed the video, so they render at its size.
+FINAL_QUALITY = "frame"
+FINAL_RESOLUTION = "1K"
 
 _EXTENSIONS = {"PNG": ".png", "JPEG": ".jpg", "WEBP": ".webp"}
 
@@ -186,6 +199,7 @@ def generate_image(
     view: str = "establishing",
     aspect_ratio: str = ASSET_ASPECT_RATIO,
     quality: str = ASSET_QUALITY,
+    resolution: str = ASSET_RESOLUTION,
 ) -> Path:
     """Render one image (an asset, or a shot's ``"final"`` frame) with one provider and save it as ``{uuid8}-{label}`` in ``directory``.
 
@@ -200,14 +214,14 @@ def generate_image(
     ratio = ASPECT_RATIOS[aspect_ratio]
     openai_quality, thinking_level = QUALITY[quality]
     if provider == "openai":
-        width, height = SIZES[ratio]
+        width, height = SIZES[resolution][ratio]
         data, usage = _openai_bytes(prompt, f"{width}x{height}", openai_quality, references)
         usd, estimated = costs.openai_cost(usage), True
     elif provider == "runware":
-        data, cost = _runware_bytes(prompt, SIZES[ratio], references)
+        data, cost = _runware_bytes(prompt, SIZES[resolution][ratio], references)
         usd, estimated = cost, False
     else:
-        data, usage = _gemini_bytes(prompt, ratio, "2K", thinking_level, references)
+        data, usage = _gemini_bytes(prompt, ratio, resolution, thinking_level, references)
         usd, estimated = costs.gemini_cost(usage), True
     image_format = Image.open(BytesIO(data)).format
     path = directory / f"{uuid.uuid4().hex[:8]}-{label}{_EXTENSIONS.get(image_format, '.png')}"
