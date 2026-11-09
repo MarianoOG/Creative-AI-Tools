@@ -207,13 +207,11 @@ def generate_shot_video(world: str, episode: str, scene: str, shot: str) -> Dict
     folder = story.scene_dir(world, episode, scene)
     end_frame = None
     if shot_data["end_on_next"]:
-        # The next shot in story order (the last shot has none), if it has a final frame.
-        ordered = [(s, sh) for s in script["scenes"] for sh in s["shots"]]
-        position = next(i for i, (s, sh) in enumerate(ordered) if sh is shot_data)
-        if position + 1 < len(ordered):
-            next_scene, next_shot = ordered[position + 1]
-            if next_shot["final"] and next_shot["final_path"]:
-                end_frame = story.scene_dir(world, episode, next_scene["id"]) / next_shot["final"]
+        # The next shot in the same scene (a scene's last shot has none), if it has a final frame.
+        shots = scene_data["shots"]
+        position = shots.index(shot_data)
+        if position + 1 < len(shots) and shots[position + 1]["final_path"]:
+            end_frame = folder / shots[position + 1]["final"]
     with provider_errors("runware"):
         path = video.generate_video(
             world, f"{shot}-video", description, style, folder / shot_data["final"], folder,

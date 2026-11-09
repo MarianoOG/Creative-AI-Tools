@@ -18,7 +18,8 @@ clip, animated from its final frame and saved beside it as
 ``duration`` (seconds, one of ``video.DURATIONS``, the shortest by default)
 and ``camera`` (one of ``video.CAMERA_MOVES``, ``Static`` by default) are
 the clip's length and camera move. ``end_on_next`` (off by default) makes the
-clip end on the next shot's final frame, when that shot has one.
+clip end on the next shot's final frame, when that shot is in the same scene
+and has one.
 
 A shot's ``id`` is its place in the scene (``shot1``, ``shot2``...), set on
 every read and save, so shots cannot be named. Removing one moves the later

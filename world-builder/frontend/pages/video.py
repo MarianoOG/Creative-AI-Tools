@@ -102,7 +102,6 @@ def render_shot(world: str, episode: str, scene: Dict, shot: Dict, video: Dict, 
 def render_grid(world: str, episode: str, script: Dict, video: Dict) -> List[Tuple[str, str]]:
     """Every shot, scene by scene, as a frame | video row. Returns the shots whose button was clicked."""
     clicked = []
-    ordered = [shot for scene in script['scenes'] for shot in scene['shots']]
     for scene in script['scenes']:
         if not scene['shots']:
             continue
@@ -113,8 +112,8 @@ def render_grid(world: str, episode: str, script: Dict, video: Dict) -> List[Tup
         for number, shot in enumerate(scene['shots']):
             if number:
                 st.divider()
-            position = next(i for i, other in enumerate(ordered) if other is shot)
-            has_next_frame = position + 1 < len(ordered) and bool(ordered[position + 1].get('final_path'))
+            following = scene['shots'][number + 1:number + 2]
+            has_next_frame = bool(following and following[0].get('final_path'))
             if render_shot(world, episode, scene, shot, video, has_next_frame):
                 clicked.append((scene['id'], shot['id']))
     return clicked
