@@ -17,9 +17,9 @@ from typing import Annotated, Dict, List, Optional, Tuple
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from app.assets import library, story
+from app.assets import library, story, video
 from app.assets.generation import (
-    ASPECT_RATIOS, DEFAULT_FINAL_PROVIDER, DEFAULT_PROVIDER, FINAL_PROVIDERS, PROVIDERS, generate_image,
+    ASPECT_RATIOS, DEFAULT_FINAL_PROVIDER, DEFAULT_PROVIDER, FINAL_PROVIDERS, PRICE_ESTIMATES, PROVIDERS, generate_image,
 )
 from app.assets.prompt_manager import (
     ASSET_DIRS, ESTABLISHING_VIEW, LEGACY_VIEW_CHANGES, STYLES, build_prompt, variation_description,
@@ -186,10 +186,20 @@ def options() -> Dict:
         "default_provider": DEFAULT_PROVIDER,
         "final_providers": list(FINAL_PROVIDERS),
         "default_final_provider": DEFAULT_FINAL_PROVIDER,
+        "price_estimates": PRICE_ESTIMATES,
         "aspect_ratios": list(ASPECT_RATIOS),
         "shot_types": story.SHOT_TYPES,
         "establishing_view": ESTABLISHING_VIEW,
         "default_world": DEFAULT_WORLD,
+        "video": {
+            "model": video.VIDEO_MODEL_NAME,
+            "resolution": video.VIDEO_RESOLUTION,
+            "usd_per_second": video.USD_PER_SECOND,
+            "durations": list(video.DURATIONS),
+            "default_duration": video.DEFAULT_DURATION,
+            "camera_moves": list(video.CAMERA_MOVES),
+            "default_camera": video.DEFAULT_CAMERA,
+        },
     }
 
 

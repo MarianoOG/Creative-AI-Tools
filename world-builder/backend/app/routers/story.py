@@ -7,7 +7,7 @@ from typing import Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.assets import library, story
+from app.assets import library, story, video
 from app.assets.generation import FINAL_PROVIDERS, generate_image
 from app.assets.prompt_manager import ASSET_DIRS
 from app.assets.worlds import read_style, read_world
@@ -126,6 +126,16 @@ def _final_references(world: str, scene: Dict) -> tuple[List, List[str]]:
     return paths, labels
 
 
+def _find_shot(script: Dict, scene: str, shot: str) -> tuple[Dict, Dict]:
+    scene_data = next((s for s in script["scenes"] if s["id"] == scene), None)
+    if scene_data is None:
+        raise HTTPException(404, f"no scene called {scene!r}")
+    shot_data = next((s for s in scene_data["shots"] if s["id"] == shot), None)
+    if shot_data is None:
+        raise HTTPException(404, f"no shot called {shot!r} - save the script first")
+    return scene_data, shot_data
+
+
 @router.post("/{episode}/scenes/{scene}/shots/{shot}/generate")
 def generate_shot(world: str, episode: str, scene: str, shot: str, body: Optional[FinalFrame] = None) -> Dict:
     """Render a shot's final frame, replacing the one it had (whose file stays on disk).
@@ -138,12 +148,7 @@ def generate_shot(world: str, episode: str, scene: str, shot: str, body: Optiona
     body = body or FinalFrame()
     check_world(world)
     script = call(story.read_script, world, episode)
-    scene_data = next((s for s in script["scenes"] if s["id"] == scene), None)
-    if scene_data is None:
-        raise HTTPException(404, f"no scene called {scene!r}")
-    shot_data = next((s for s in scene_data["shots"] if s["id"] == shot), None)
-    if shot_data is None:
-        raise HTTPException(404, f"no shot called {shot!r} - save the script first")
+    scene_data, shot_data = _find_shot(script, scene, shot)
 
     description = story.shot_description(scene_data, shot_data, _cast(world, scene_data))
     if not description.strip():
@@ -175,3 +180,33 @@ def generate_shot(world: str, episode: str, scene: str, shot: str, body: Optiona
             quality="high",
         )
     return story.with_images(world, episode, story.set_shot_image(world, episode, scene, shot, path, "final", provider))
+
+
+@router.post("/{episode}/scenes/{scene}/shots/{shot}/video")
+def generate_shot_video(world: str, episode: str, scene: str, shot: str) -> Dict:
+    """Render a shot's video from its final frame, replacing the one it had (whose file stays on disk).
+
+    It uses Runware's MiniMax H3 Fast at 768p for the shot's ``duration``, starting
+    from the shot's final frame and prompted with the shot's text (the scene's
+    heading, summary and cast, and the shot's type and action), its ``camera``
+    move and the world's style. No dialogue or voices.
+    """
+    check_world(world)
+    script = story.with_images(world, episode, call(story.read_script, world, episode))
+    scene_data, shot_data = _find_shot(script, scene, shot)
+    if not shot_data["final_path"]:
+        raise HTTPException(422, "This shot has no final frame yet - generate it on the Storyboard first.")
+    description = story.shot_description(scene_data, shot_data, _cast(world, scene_data))
+    if not description.strip():
+        raise HTTPException(422, "Describe the shot (or the scene) before generating its video.")
+    style = read_style(world)
+    if not style:
+        raise HTTPException(422, "This world has no style yet - write one in Manage worlds.")
+
+    folder = story.scene_dir(world, episode, scene)
+    with provider_errors("runware"):
+        path = video.generate_video(
+            world, f"{shot}-video", description, style, folder / shot_data["final"], folder,
+            duration=shot_data["duration"], camera=shot_data["camera"],
+        )
+    return story.with_images(world, episode, story.set_shot_image(world, episode, scene, shot, path, "video"))

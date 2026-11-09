@@ -58,6 +58,7 @@ pages = {
     "Story": [
         st.Page("pages/script.py", title="Script", icon=":material/description:"),
         st.Page("pages/storyboard.py", title="Storyboard", icon=":material/movie:"),
+        st.Page("pages/video.py", title="Video", icon=":material/videocam:"),
     ],
     "Settings": [
         st.Page("pages/worlds.py", title="Manage worlds", icon=":material/settings:"),
