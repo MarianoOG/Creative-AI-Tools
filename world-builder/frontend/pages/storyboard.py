@@ -4,7 +4,7 @@ Two frames per row, each with one line under it: the shot's type (saved as soon
 as it changes) and a Generate or Regenerate button with its price (this
 world's average logged cost for the model, else a rough list price).
 
-A final frame is the finished image of a shot, rendered once by OpenAI, Gemini or Runware (Flux 2 Klein) at high quality from
+A final frame is the finished image of a shot, rendered once by OpenAI, Gemini or Runware (Flux 2 Klein) at 1K (the video's size) from
 the shot's text and the designs of everything the scene lists, in the world's
 style. Each one can be regenerated on its own (there is no "regenerate all": it
 costs too much to be one click away); the old file stays on disk.
