@@ -119,9 +119,13 @@ def _video_result(task_uuid: str) -> Optional[Dict]:
     return None
 
 
-def _runware_video(prompt: str, frame: Path, duration: int) -> Tuple[bytes, Optional[float]]:
+def _runware_video(prompt: str, frame: Path, duration: int,
+                   end_frame: Optional[Path] = None) -> Tuple[bytes, Optional[float]]:
     import httpx
 
+    frames = [{"image": _frame_data_uri(frame), "frame": "first"}]
+    if end_frame:
+        frames.append({"image": _frame_data_uri(end_frame), "frame": "last"})
     task_uuid = str(uuid.uuid4())
     task: Dict[str, Any] = {
         "taskType": "videoInference",
@@ -130,7 +134,7 @@ def _runware_video(prompt: str, frame: Path, duration: int) -> Tuple[bytes, Opti
         "positivePrompt": prompt,
         "duration": duration,
         "resolution": VIDEO_RESOLUTION,
-        "inputs": {"frameImages": [{"image": _frame_data_uri(frame), "frame": "first"}]},
+        "inputs": {"frameImages": frames},
         "outputType": "URL",
         "outputFormat": "MP4",
         "numberResults": 1,
@@ -158,15 +162,18 @@ def _runware_video(prompt: str, frame: Path, duration: int) -> Tuple[bytes, Opti
 
 
 def generate_video(world: str, label: str, description: str, style: str, frame: Path, directory: Path,
-                   duration: int = DEFAULT_DURATION, camera: str = DEFAULT_CAMERA) -> Path:
+                   duration: int = DEFAULT_DURATION, camera: str = DEFAULT_CAMERA,
+                   end_frame: Optional[Path] = None) -> Path:
     """Render one shot video from its final ``frame`` and save it as ``{uuid8}-{label}.mp4`` in ``directory``.
+
+    With ``end_frame`` (the next shot's final frame) the clip ends on it.
 
     Raises if Runware fails; nothing is written then. What it billed is appended to ``world``'s cost log.
     """
     if duration not in DURATIONS:
         raise ValueError(f"duration must be one of {list(DURATIONS)} seconds")
     prompt = build_video_prompt(description, style, camera)
-    data, cost = _runware_video(prompt, frame, duration)
+    data, cost = _runware_video(prompt, frame, duration, end_frame)
     path = directory / f"{uuid.uuid4().hex[:8]}-{label}.mp4"
     directory.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
