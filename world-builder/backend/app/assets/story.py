@@ -17,7 +17,9 @@ clip, animated from its final frame and saved beside it as
 ``{uuid8}-{shot}-video.mp4``; regenerating it works the same way. Its
 ``duration`` (seconds, one of ``video.DURATIONS``, the shortest by default)
 and ``camera`` (one of ``video.CAMERA_MOVES``, ``Static`` by default) are
-the clip's length and camera move.
+the clip's length and camera move. ``end_on_next`` (off by default) makes the
+clip end on the next shot's final frame, when that shot is in the same scene
+and has one.
 
 A shot's ``id`` is its place in the scene (``shot1``, ``shot2``...), set on
 every read and save, so shots cannot be named. Removing one moves the later
@@ -64,7 +66,7 @@ SCRIPT_FILE = "script.json"
 SHOT_FILES = {"image": "path", "final": "final_path", "video": "video_path"}
 #: A shot's settings, each edited on its own page (type on the Storyboard, duration and camera on Video).
 #: Like its files, a save that leaves them out keeps what is on disk.
-SHOT_SETTINGS = ("type", "duration", "camera")
+SHOT_SETTINGS = ("type", "duration", "camera", "end_on_next")
 
 #: The framings a shot can have, from the widest to the tightest.
 SHOT_TYPES = [
@@ -120,6 +122,7 @@ def _clean_shot(raw: Dict, folder: Path) -> Dict:
         "video": Path(str(raw["video"])).name if raw.get("video") else None,
         "duration": raw.get("duration") if raw.get("duration") in DURATIONS else DEFAULT_DURATION,
         "camera": raw.get("camera") if raw.get("camera") in CAMERA_MOVES else DEFAULT_CAMERA,
+        "end_on_next": raw.get("end_on_next") is True,
     }
 
 

@@ -34,10 +34,11 @@ def money(usd: float) -> str:
     return f"\\${usd:.2f}"
 
 
-def render_controls(world: str, episode: str, scene: Dict, shot: Dict, video: Dict) -> bool:
-    """One line: the camera move and clip length (saved as soon as either changes) and the priced
-    Generate or Regenerate button. Returns whether the button was clicked."""
-    camera_col, length_col, button_col = st.columns([3, 2, 4], vertical_alignment='center')
+def render_controls(world: str, episode: str, scene: Dict, shot: Dict, video: Dict, has_next_frame: bool) -> bool:
+    """One line: the camera move, clip length and "end on the next shot" toggle (saved as soon as any changes)
+    and the priced Generate or Regenerate button. The toggle needs a next shot with a final frame.
+    Returns whether the button was clicked."""
+    camera_col, length_col, next_col, button_col = st.columns([3, 2, 2, 4], vertical_alignment='center')
     prefix = f"video_{world}_{episode}_{scene['id']}_{shot['id']}_{st.session_state.script_revision}_"
     camera_col.selectbox(
         "Camera", video['camera_moves'], index=video['camera_moves'].index(shot['camera']),
@@ -49,6 +50,12 @@ def render_controls(world: str, episode: str, scene: Dict, shot: Dict, video: Di
         format_func=lambda seconds: f"{seconds} s", label_visibility='collapsed', help="Clip length",
         key=f"{prefix}duration", on_change=save_shot_setting,
         args=(world, episode, scene['id'], shot['id'], 'duration', f"{prefix}duration", True),
+    )
+    next_col.toggle(
+        "Next", value=shot['end_on_next'] and has_next_frame, disabled=not has_next_frame,
+        help="End the clip on the next shot's final frame" if has_next_frame
+        else "Needs a next shot with a final frame", key=f"{prefix}end_on_next", on_change=save_shot_setting,
+        args=(world, episode, scene['id'], shot['id'], 'end_on_next', f"{prefix}end_on_next", True),
     )
     label = "Regenerate" if shot.get('video_path') else "Generate"
     return button_col.button(f"{label} · {money(clip_price(video, shot))}", key=f"video_{scene['id']}_{shot['id']}",
@@ -69,7 +76,7 @@ def shot_caption(shot: Dict) -> str:
     return " · ".join(part for part in parts if part)
 
 
-def render_shot(world: str, episode: str, scene: Dict, shot: Dict, video: Dict) -> bool:
+def render_shot(world: str, episode: str, scene: Dict, shot: Dict, video: Dict, has_next_frame: bool) -> bool:
     """One shot as a row: its frame on the left, its video on the right, then one line beneath each,
     side by side: under the frame, a warning when the video is older than it; under the video, the camera,
     length and priced button. Returns whether the button was clicked."""
@@ -89,7 +96,7 @@ def render_shot(world: str, episode: str, scene: Dict, shot: Dict, video: Dict) 
     if is_stale(shot):
         warning_col.warning("Frame changed after this video. Regenerate to match.", icon=":material/sync_problem:")
     with controls_col:
-        return render_controls(world, episode, scene, shot, video)
+        return render_controls(world, episode, scene, shot, video, has_next_frame)
 
 
 def render_grid(world: str, episode: str, script: Dict, video: Dict) -> List[Tuple[str, str]]:
@@ -105,7 +112,9 @@ def render_grid(world: str, episode: str, script: Dict, video: Dict) -> List[Tup
         for number, shot in enumerate(scene['shots']):
             if number:
                 st.divider()
-            if render_shot(world, episode, scene, shot, video):
+            following = scene['shots'][number + 1:number + 2]
+            has_next_frame = bool(following and following[0].get('final_path'))
+            if render_shot(world, episode, scene, shot, video, has_next_frame):
                 clicked.append((scene['id'], shot['id']))
     return clicked
 
