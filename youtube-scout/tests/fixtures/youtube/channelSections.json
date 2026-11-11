@@ -1,0 +1,20 @@
+{
+ "UCseed": {
+  "items": [
+   {
+    "snippet": {
+     "type": "multiplechannels"
+    },
+    "contentDetails": {
+     "channels": [
+      "UCfeat",
+      "UCbig"
+     ]
+    }
+   }
+  ]
+ },
+ "UCgood": {
+  "items": []
+ }
+}

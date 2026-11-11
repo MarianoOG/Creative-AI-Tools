@@ -1,0 +1,10 @@
+Copy this file to brand.txt (git-ignored) and replace the text below with your
+own description. It is the only niche input: keywords are generated from it.
+
+Describe your brand or channel, what you make, and who watches it. For example:
+
+A channel about woodworking with hand tools for small apartments: quiet
+techniques, compact workbenches, and beginner projects that need no power
+tools. The audience is adults who rent, have little space, and want to start
+woodworking without a garage. Videos are tutorials and build logs, in English
+and Spanish.

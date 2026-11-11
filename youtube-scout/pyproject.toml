@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "youtube-scout"
+version = "0.1.0"
+description = "Find small YouTube channels in a niche you describe, with the official YouTube Data API."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=2.8,<3",
+    "python-dotenv>=1.2",
+    "requests>=2.32",
+]
+
+[project.optional-dependencies]
+openai = ["openai>=1.40"]
+dev = ["pytest>=8"]
+
+[project.scripts]
+peer-scout = "youtube_scout.cli:main"
+
+[tool.setuptools]
+packages = ["youtube_scout"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

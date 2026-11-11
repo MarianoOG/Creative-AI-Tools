@@ -1,0 +1,45 @@
+# Copy to config.toml (git-ignored) and edit.
+
+# Your channel id (UC...). Optional if size_band gives absolute numbers;
+# otherwise used to size the band from your subscriber count.
+my_channel_id = ""
+
+# Languages to search and keep (ISO 639-1 codes).
+languages = ["en", "es"]
+
+# Optional channel ids to expand from (their commenters who publish videos,
+# featured channels and public subscriptions).
+seed_channels = []
+
+max_results_per_run = 20
+
+# Optional file with one channel id per line to never report (# comments ok).
+exclude_channel_ids_file = ""
+
+# Delete dated outputs and state after this many days (1 to 30).
+retention_days = 30
+
+[size_band]
+# Either absolute bounds...
+# min_subscribers = 500
+# max_subscribers = 20000
+# ...or multipliers of your own subscriber count (needs my_channel_id).
+min_multiplier = 0.3
+max_multiplier = 3.0
+
+[discovery]
+searches_per_run = 8            # search.list costs 100 units each
+search_window_days = 14         # only videos published in this window
+search_results_per_keyword = 50 # one page, no deep pagination
+keyword_count = 30
+last_upload_within_days = 30
+recent_titles = 5
+seed_videos = 3                 # recent seed videos to read commenters from
+peer_graph = true               # featured channels + public subscriptions
+snowball_frontier_max = 10      # kept channels that seed the next run
+snowball_max_depth = 2          # hops away from a keyword or seed
+skip_reported_days = 30         # do not repeat a channel reported this recently
+
+[quota]
+daily_quota = 10000             # your project's daily quota
+stop_fraction = 0.8             # hard stop at this share (max 0.8)
