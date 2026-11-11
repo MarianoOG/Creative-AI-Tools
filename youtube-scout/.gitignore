@@ -1,0 +1,13 @@
+# Local niche input, keys and config: never committed
+brand.txt
+keywords.generated.txt
+config.toml
+.env
+exclude*.txt
+
+# Outputs, state and caches: never committed (open-source the system, not data)
+out/
+state/
+cache/
+*.egg-info/
+.pytest_cache/

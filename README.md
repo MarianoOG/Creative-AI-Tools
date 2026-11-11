@@ -7,7 +7,7 @@ README, dependencies and virtual environment.
 | Tool | What it does | Shape |
 | --- | --- | --- |
 | [`world-builder/`](world-builder/README.md) | Build worlds with one visual style: characters, locations, objects, and episodes storyboarded scene by scene | FastAPI backend + Streamlit UI |
-| [`youtube-scout/`](youtube-scout/README.md) | Research YouTube channels and videos: search, filter, and score creators and their uploads | Python library, built to be driven by an AI agent |
+| [`youtube-scout/`](youtube-scout/README.md) | Find small YouTube channels in a niche you describe, once a day, with the official YouTube Data API | Command-line data tool (`peer-scout`) |
 
 Start with the README of the tool you want to use; each one explains its own
 setup. World Builder keeps its worlds in `data/assets/` at the repository root

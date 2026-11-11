@@ -1,0 +1,120 @@
+{
+ "UUgood": {
+  "items": [
+   {
+    "snippet": {
+     "title": "Clay walk cycle test",
+     "publishedAt": "2026-11-05T10:00:00Z"
+    },
+    "contentDetails": {
+     "videoId": "g1",
+     "videoPublishedAt": "2026-11-05T10:00:00Z"
+    }
+   },
+   {
+    "snippet": {
+     "title": "Plasticine lip sync",
+     "publishedAt": "2026-10-20T10:00:00Z"
+    },
+    "contentDetails": {
+     "videoId": "g2",
+     "videoPublishedAt": "2026-10-20T10:00:00Z"
+    }
+   },
+   {
+    "snippet": {
+     "title": "Private video",
+     "publishedAt": "2026-10-01T00:00:00Z"
+    },
+    "contentDetails": {
+     "videoId": "g0",
+     "videoPublishedAt": "2026-10-01T00:00:00Z"
+    }
+   }
+  ]
+ },
+ "UUold": {
+  "items": [
+   {
+    "snippet": {
+     "title": "Last stop motion",
+     "publishedAt": "2025-01-01T00:00:00Z"
+    },
+    "contentDetails": {
+     "videoId": "o1",
+     "videoPublishedAt": "2025-01-01T00:00:00Z"
+    }
+   }
+  ]
+ },
+ "UUoff": {
+  "items": [
+   {
+    "snippet": {
+     "title": "Pasta in 10 minutes",
+     "publishedAt": "2026-11-08T10:00:00Z"
+    },
+    "contentDetails": {
+     "videoId": "c1",
+     "videoPublishedAt": "2026-11-08T10:00:00Z"
+    }
+   }
+  ]
+ },
+ "UUfr": {
+  "items": [
+   {
+    "snippet": {
+     "title": "Animation pâte à modeler",
+     "publishedAt": "2026-11-08T10:00:00Z"
+    },
+    "contentDetails": {
+     "videoId": "f1",
+     "videoPublishedAt": "2026-11-08T10:00:00Z"
+    }
+   }
+  ]
+ },
+ "UUseed": {
+  "items": [
+   {
+    "snippet": {
+     "title": "Seed video",
+     "publishedAt": "2026-11-01T10:00:00Z"
+    },
+    "contentDetails": {
+     "videoId": "s1",
+     "videoPublishedAt": "2026-11-01T10:00:00Z"
+    }
+   }
+  ]
+ },
+ "UUpub": {
+  "items": [
+   {
+    "snippet": {
+     "title": "Puppet walk test",
+     "publishedAt": "2026-11-02T10:00:00Z"
+    },
+    "contentDetails": {
+     "videoId": "p1",
+     "videoPublishedAt": "2026-11-02T10:00:00Z"
+    }
+   }
+  ]
+ },
+ "UUfeat": {
+  "items": [
+   {
+    "snippet": {
+     "title": "Claymation short",
+     "publishedAt": "2026-11-03T10:00:00Z"
+    },
+    "contentDetails": {
+     "videoId": "fe1",
+     "videoPublishedAt": "2026-11-03T10:00:00Z"
+    }
+   }
+  ]
+ }
+}

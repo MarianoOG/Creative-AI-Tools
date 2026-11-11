@@ -1,0 +1,369 @@
+{
+ "items": [
+  {
+   "kind": "youtube#channel",
+   "id": "UCme",
+   "snippet": {
+    "title": "My Channel",
+    "description": "Clay animation experiments",
+    "publishedAt": "2024-01-01T00:00:00Z",
+    "country": "US"
+   },
+   "statistics": {
+    "subscriberCount": "1000",
+    "videoCount": "40",
+    "hiddenSubscriberCount": false,
+    "viewCount": "1000"
+   },
+   "contentDetails": {
+    "relatedPlaylists": {
+     "uploads": "UUme"
+    }
+   },
+   "status": {
+    "madeForKids": false,
+    "privacyStatus": "public"
+   },
+   "brandingSettings": {
+    "channel": {}
+   }
+  },
+  {
+   "kind": "youtube#channel",
+   "id": "UCgood",
+   "snippet": {
+    "title": "Clayframe Studio",
+    "description": "Stop motion with plasticine, frame by frame.",
+    "publishedAt": "2024-01-01T00:00:00Z",
+    "country": "US"
+   },
+   "statistics": {
+    "subscriberCount": "900",
+    "videoCount": "12",
+    "hiddenSubscriberCount": false,
+    "viewCount": "1000"
+   },
+   "contentDetails": {
+    "relatedPlaylists": {
+     "uploads": "UUgood"
+    }
+   },
+   "status": {
+    "madeForKids": false,
+    "privacyStatus": "public"
+   },
+   "brandingSettings": {
+    "channel": {}
+   }
+  },
+  {
+   "kind": "youtube#channel",
+   "id": "UCbig",
+   "snippet": {
+    "title": "Huge Animation",
+    "description": "Big studio",
+    "publishedAt": "2024-01-01T00:00:00Z",
+    "country": "US"
+   },
+   "statistics": {
+    "subscriberCount": "500000",
+    "videoCount": "900",
+    "hiddenSubscriberCount": false,
+    "viewCount": "1000"
+   },
+   "contentDetails": {
+    "relatedPlaylists": {
+     "uploads": "UUbig"
+    }
+   },
+   "status": {
+    "madeForKids": false,
+    "privacyStatus": "public"
+   },
+   "brandingSettings": {
+    "channel": {}
+   }
+  },
+  {
+   "kind": "youtube#channel",
+   "id": "UCkids",
+   "snippet": {
+    "title": "Clay For Kids",
+    "description": "Fun clay for children",
+    "publishedAt": "2024-01-01T00:00:00Z",
+    "country": "US"
+   },
+   "statistics": {
+    "subscriberCount": "800",
+    "videoCount": "30",
+    "hiddenSubscriberCount": false,
+    "viewCount": "1000"
+   },
+   "contentDetails": {
+    "relatedPlaylists": {
+     "uploads": "UUkids"
+    }
+   },
+   "status": {
+    "madeForKids": true,
+    "privacyStatus": "public"
+   },
+   "brandingSettings": {
+    "channel": {}
+   }
+  },
+  {
+   "kind": "youtube#channel",
+   "id": "UCminor",
+   "snippet": {
+    "title": "Tiny Animator",
+    "description": "I'm 12 and I love stop motion!",
+    "publishedAt": "2024-01-01T00:00:00Z",
+    "country": "US"
+   },
+   "statistics": {
+    "subscriberCount": "700",
+    "videoCount": "8",
+    "hiddenSubscriberCount": false,
+    "viewCount": "1000"
+   },
+   "contentDetails": {
+    "relatedPlaylists": {
+     "uploads": "UUminor"
+    }
+   },
+   "status": {
+    "madeForKids": false,
+    "privacyStatus": "public"
+   },
+   "brandingSettings": {
+    "channel": {}
+   }
+  },
+  {
+   "kind": "youtube#channel",
+   "id": "UCold",
+   "snippet": {
+    "title": "Old Clay",
+    "description": "Stop motion, retired",
+    "publishedAt": "2024-01-01T00:00:00Z",
+    "country": "US"
+   },
+   "statistics": {
+    "subscriberCount": "1200",
+    "videoCount": "20",
+    "hiddenSubscriberCount": false,
+    "viewCount": "1000"
+   },
+   "contentDetails": {
+    "relatedPlaylists": {
+     "uploads": "UUold"
+    }
+   },
+   "status": {
+    "madeForKids": false,
+    "privacyStatus": "public"
+   },
+   "brandingSettings": {
+    "channel": {}
+   }
+  },
+  {
+   "kind": "youtube#channel",
+   "id": "UChidden",
+   "snippet": {
+    "title": "Hidden Subs",
+    "description": "Stop motion",
+    "publishedAt": "2024-01-01T00:00:00Z",
+    "country": "US"
+   },
+   "statistics": {
+    "subscriberCount": "0",
+    "videoCount": "15",
+    "hiddenSubscriberCount": true,
+    "viewCount": "1000"
+   },
+   "contentDetails": {
+    "relatedPlaylists": {
+     "uploads": "UUhidden"
+    }
+   },
+   "status": {
+    "madeForKids": false,
+    "privacyStatus": "public"
+   },
+   "brandingSettings": {
+    "channel": {}
+   }
+  },
+  {
+   "kind": "youtube#channel",
+   "id": "UCoff",
+   "snippet": {
+    "title": "Cooking Daily",
+    "description": "Recipes every day",
+    "publishedAt": "2024-01-01T00:00:00Z",
+    "country": "US"
+   },
+   "statistics": {
+    "subscriberCount": "1500",
+    "videoCount": "200",
+    "hiddenSubscriberCount": false,
+    "viewCount": "1000"
+   },
+   "contentDetails": {
+    "relatedPlaylists": {
+     "uploads": "UUoff"
+    }
+   },
+   "status": {
+    "madeForKids": false,
+    "privacyStatus": "public"
+   },
+   "brandingSettings": {
+    "channel": {}
+   }
+  },
+  {
+   "kind": "youtube#channel",
+   "id": "UCfr",
+   "snippet": {
+    "title": "P\u00e2te \u00e0 modeler",
+    "description": "Animation en p\u00e2te \u00e0 modeler",
+    "publishedAt": "2024-01-01T00:00:00Z",
+    "country": "US",
+    "defaultLanguage": "fr"
+   },
+   "statistics": {
+    "subscriberCount": "1100",
+    "videoCount": "9",
+    "hiddenSubscriberCount": false,
+    "viewCount": "1000"
+   },
+   "contentDetails": {
+    "relatedPlaylists": {
+     "uploads": "UUfr"
+    }
+   },
+   "status": {
+    "madeForKids": false,
+    "privacyStatus": "public"
+   },
+   "brandingSettings": {
+    "channel": {}
+   }
+  },
+  {
+   "kind": "youtube#channel",
+   "id": "UCseed",
+   "snippet": {
+    "title": "Seed Studio",
+    "description": "Stop motion seed channel",
+    "publishedAt": "2024-01-01T00:00:00Z",
+    "country": "US"
+   },
+   "statistics": {
+    "subscriberCount": "2000",
+    "videoCount": "100",
+    "hiddenSubscriberCount": false,
+    "viewCount": "1000"
+   },
+   "contentDetails": {
+    "relatedPlaylists": {
+     "uploads": "UUseed"
+    }
+   },
+   "status": {
+    "madeForKids": false,
+    "privacyStatus": "public"
+   },
+   "brandingSettings": {
+    "channel": {}
+   }
+  },
+  {
+   "kind": "youtube#channel",
+   "id": "UCpub",
+   "snippet": {
+    "title": "Commenter Who Publishes",
+    "description": "Puppet animation tests",
+    "publishedAt": "2024-01-01T00:00:00Z",
+    "country": "US"
+   },
+   "statistics": {
+    "subscriberCount": "600",
+    "videoCount": "5",
+    "hiddenSubscriberCount": false,
+    "viewCount": "1000"
+   },
+   "contentDetails": {
+    "relatedPlaylists": {
+     "uploads": "UUpub"
+    }
+   },
+   "status": {
+    "madeForKids": false,
+    "privacyStatus": "public"
+   },
+   "brandingSettings": {
+    "channel": {}
+   }
+  },
+  {
+   "kind": "youtube#channel",
+   "id": "UCviewer",
+   "snippet": {
+    "title": "Just A Viewer",
+    "description": "",
+    "publishedAt": "2024-01-01T00:00:00Z",
+    "country": "US"
+   },
+   "statistics": {
+    "subscriberCount": "3",
+    "videoCount": "0",
+    "hiddenSubscriberCount": false,
+    "viewCount": "1000"
+   },
+   "contentDetails": {
+    "relatedPlaylists": {
+     "uploads": "UUviewer"
+    }
+   },
+   "status": {
+    "madeForKids": false,
+    "privacyStatus": "public"
+   },
+   "brandingSettings": {
+    "channel": {}
+   }
+  },
+  {
+   "kind": "youtube#channel",
+   "id": "UCfeat",
+   "snippet": {
+    "title": "Featured Friend",
+    "description": "Claymation shorts",
+    "publishedAt": "2024-01-01T00:00:00Z",
+    "country": "US"
+   },
+   "statistics": {
+    "subscriberCount": "1300",
+    "videoCount": "22",
+    "hiddenSubscriberCount": false,
+    "viewCount": "1000"
+   },
+   "contentDetails": {
+    "relatedPlaylists": {
+     "uploads": "UUfeat"
+    }
+   },
+   "status": {
+    "madeForKids": false,
+    "privacyStatus": "public"
+   },
+   "brandingSettings": {
+    "channel": {}
+   }
+  }
+ ]
+}

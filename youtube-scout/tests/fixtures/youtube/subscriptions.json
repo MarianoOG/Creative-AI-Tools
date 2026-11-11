@@ -1,0 +1,20 @@
+{
+ "UCseed": {
+  "error": {
+   "status": 403,
+   "reason": "subscriptionForbidden"
+  }
+ },
+ "UCgood": {
+  "items": [
+   {
+    "snippet": {
+     "resourceId": {
+      "kind": "youtube#channel",
+      "channelId": "UCfeat"
+     }
+    }
+   }
+  ]
+ }
+}
