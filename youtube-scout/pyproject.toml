@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "youtube-scout"
+version = "0.2.0"
+description = "Small, read-only command-line tools for the YouTube Data API v3. Prints JSON."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+yt = "yt:main"
+
+[tool.setuptools]
+py-modules = ["yt"]

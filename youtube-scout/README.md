@@ -1,69 +1,86 @@
 # YouTube Scout
 
-Find the YouTube channels behind a topic, narrow them down by size, reach and
-activity, and look into any one channel's stats and uploads. A small Python
-library: plain functions that return JSON-ready dicts and lists. Nothing is
-stored on disk; every search asks YouTube afresh.
+Small, read-only tools for the YouTube Data API v3, in one file:
+[`yt.py`](yt.py). Each tool makes one kind of API call and prints JSON, so you
+can read it, pipe it, or let an agent or a Claude session call it. Nothing is
+saved to disk and there is no scoring: the tools fetch data, and you (or Claude)
+decide what it means.
 
-> A command-line interface and a Claude Code skill built on it are planned.
+This tool uses YouTube API Services: see the
+[YouTube Terms of Service](https://www.youtube.com/t/terms) and the
+[Google Privacy Policy](https://policies.google.com/privacy).
 
 ## Setup
 
+Python 3.10+, no other dependencies.
+
 ```bash
 cd youtube-scout
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env   # then set YOUTUBE_API_KEY
+cp .env.example .env   # then add your YOUTUBE_API_KEY
 ```
 
-Get a YouTube Data API v3 key from the
-[Google Cloud console](https://console.cloud.google.com/apis/credentials).
-The key can also come from the environment. Run Python from the `youtube-scout`
-folder so `import youtube_scout` works.
+Get a key from the [Google Cloud console](https://console.cloud.google.com/apis/credentials)
+(enable "YouTube Data API v3"). The key can also come from the environment.
 
-## Usage
+Run it as `python yt.py ...`, or install the `yt` command anywhere:
+
+```bash
+pip install "git+https://github.com/MarianoOG/Creative-AI-Tools#subdirectory=youtube-scout"
+```
+
+## Tools
+
+| Command | Returns | Quota units |
+| --- | --- | --- |
+| `yt channel REF` | A channel's profile and stats (`REF` = `UC…` id, `@handle` or channel URL) | 1 |
+| `yt uploads REF -n 10` | Its latest videos, newest first, with views, likes, comments | 3 |
+| `yt videos ID…` | Stats and details for given videos | 1 per 50 |
+| `yt search "QUERY" [--days 14] [--lang es] [--order date] [--region MX] [-n 25]` | Videos for a query (one page, up to 50) | 100 |
+| `yt creators "QUERY" [same options]` | The channels behind that search, with the titles they matched | 101 |
+| `yt comments VIDEO_ID -n 100` | Top-level comment text, likes and reply count (no author names or ids) | 1 per 100 |
+| `yt featured REF` | Channel ids the channel features on its page | 1 (+1 for a handle) |
+| `yt subscriptions REF` | Channel ids it subscribes to, if the list is public | 1 (+1 for a handle) |
+| `yt band MIN MAX < channels.json` | Channels with MIN–MAX subscribers, videos, not made for kids | 0 |
+
+Units used are printed to stderr after each command. The default quota is
+10,000 units a day; `search` and `creators` are the expensive ones.
+
+## Examples
+
+```bash
+# What does a channel make lately?
+python yt.py uploads @somehandle -n 15
+
+# Small creators who posted about a topic in the last two weeks
+python yt.py creators "stop motion tutorial" --days 14 > creators.json
+python yt.py band 300 3000 < creators.json
+
+# What are viewers asking under a video?
+python yt.py comments dQw4w9WgXcQ -n 200
+```
+
+From Python:
 
 ```python
-from youtube_scout import search, filter_channels, sort_channels, get_creator
+import yt
 
-channels = search("stop motion animation", max_results=200)["channels"]
-picked = filter_channels(channels, min_subscribers=1_000, active_within_days=90)
-for channel in sort_channels(picked, "channel_score")[:10]:
-    print(channel["channel_name"], channel["median_views"], channel["channel_score"])
-
-creator = get_creator("@somehandle")   # or a channel id
-print(creator["publish_interval_days"], creator["uploads_by_month"])
+me = yt.channel("@somehandle")
+peers = yt.band(yt.creators("stop motion", days=14), me["subscribers"] // 3, me["subscribers"] * 3)
 ```
 
-## Functions
+## Rules
 
-| Function | Returns |
-| --- | --- |
-| `search(keyword, max_results=1000)` | `{keyword, channels}`: the channels behind the top videos, in relevance order, each with its profile, the `videos` found and the metrics below |
-| `filter_channels(channels, *, min_views, max_views, min_subscribers, max_subscribers, active_within_days, min_videos, max_videos, min_score)` | The channels within every given bound (inclusive). Views are median views, videos are total uploads |
-| `sort_channels(channels, sort_by="relevance", descending=True)` | The channels sorted by one of `SORT_FIELDS`: `relevance`, `median_views`, `subscriber_count`, `last_published`, `channel_score`, `views_to_subs_ratio`, `likes_to_views_ratio` |
-| `get_creator(channel, max_videos=50)` | One channel (id or `@handle`) with metrics over its latest uploads (`videos`, max 50) and `uploads_by_month` for the last six months |
+- Official YouTube Data API only, `GET` requests only: it never posts, likes,
+  subscribes or comments.
+- Your key stays in `.env` or the environment, never in the repo.
+- Nothing is written to disk. Comment text is returned without author names or
+  ids; if you save results, don't commit them, and refresh or delete YouTube data
+  within 30 days.
 
-Problems to show the user (missing key, API error, nothing found, bad sort
-field) raise `ScoutError`. Timestamps are ISO 8601 strings.
+## Tests
 
-## Metrics
+```bash
+pip install pytest && pytest
+```
 
-| Field | Meaning |
-| --- | --- |
-| `median_views`, `average_views` | Typical reach; the median is not skewed by one viral video |
-| `median_likes`, `median_comments` | Typical response per video |
-| `views_to_subs_ratio` | Median views as % of subscribers |
-| `likes_to_views_ratio`, `comments_to_views_ratio` | Engagement, % of median views |
-| `avg_duration` | Average video length in seconds |
-| `publish_interval_days` | Average days between uploads |
-| `last_published`, `days_since_last_published` | Newest video and its age |
-| `channel_score` | 0-100: activity 30%, views-to-subscribers 35%, engagement 35% |
-
-## Quota
-
-The YouTube Data API allows 10,000 units a day by default. Search costs 100
-units per 50 results, so `max_results=1000` uses about 2,000 units; lower it to
-spend less. Video and channel statistics cost 1 unit per 50 items, and
-`get_creator` a few units.
+The API is faked in the tests; they never call the network.
