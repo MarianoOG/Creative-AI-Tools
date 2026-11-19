@@ -56,7 +56,7 @@ def api(monkeypatch):
             if params["videoId"] == "off":
                 raise yt.YouTubeError("commentThreads: HTTP 403 commentsDisabled")
             page = params.get("pageToken") or "p1"
-            items = [{"snippet": {"totalReplyCount": 1, "topLevelComment": {"snippet": {
+            items = [{"id": f"t{page}{i}", "snippet": {"totalReplyCount": 1, "topLevelComment": {"id": f"c{page}{i}", "snippet": {
                 "textOriginal": f"{page} q{i}?", "likeCount": i, "authorDisplayName": "Someone",
                 "authorChannelId": {"value": "UCsomeone"}}}}} for i in range(100)]
             return {"items": items, "nextPageToken": "p2" if page == "p1" else None}
@@ -115,7 +115,8 @@ def test_creators_groups_hits_by_channel(api):
 def test_comments_paginate_and_drop_authors(api):
     result = yt.comments("v1", n=150)
     assert len(result) == 150 and result[100]["text"] == "p2 q0?"
-    assert set(result[0]) == {"text", "likes", "replies", "published_at"}
+    assert set(result[0]) == {"comment_id", "url", "text", "likes", "replies", "published_at"}
+    assert result[0]["url"] == "https://www.youtube.com/watch?v=v1&lc=cp10"
     assert yt.comments("off") == []
 
 
@@ -137,6 +138,11 @@ def test_cli_prints_json(api, capsys):
     assert yt.main(["channel", "UCa"]) == 0
     out, err = capsys.readouterr()
     assert json.loads(out)["channel_id"] == "UCa" and "1 quota units" in err
+
+
+def test_cli_channels(api, capsys):
+    assert yt.main(["channels", "UCa", "UCb"]) == 0
+    assert [c["channel_id"] for c in json.loads(capsys.readouterr().out)] == ["UCa", "UCb"]
 
 
 def test_cli_band_reads_stdin(api, monkeypatch, capsys):
