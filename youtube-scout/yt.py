@@ -8,8 +8,9 @@ Every command prints JSON, so a script, an agent or a Claude session can read it
     python yt.py uploads @handle -n 10           # its latest videos with stats
     python yt.py search "stop motion" --days 14  # recent videos for a query
     python yt.py creators "stop motion"          # the channels behind those videos
-    python yt.py comments VIDEO_ID -n 100        # top-level comment text
+    python yt.py comments VIDEO_ID -n 100        # top-level comments, each with a link
     python yt.py videos ID1 ID2                  # stats for given videos
+    python yt.py channels UC1 UC2                # profiles for given channel ids
     python yt.py featured @handle                # channels it features
     python yt.py subscriptions @handle           # channels it subscribes to (if public)
     python yt.py band 500 5000 < creators.json   # keep channels in a subscriber range
@@ -211,9 +212,9 @@ def creators(query: str, n: int = 25, **search_args) -> list[dict]:
 
 
 def comments(video_id: str, n: int = 100, order: str = "relevance") -> list[dict]:
-    """Top-level comment text of a video, without author names or ids. 1 unit per 100.
+    """Top-level comments of a video: text, a link to the comment, likes, replies. 1 unit per 100.
 
-    Returns [] when comments are turned off.
+    Author names and ids are left out. Returns [] when comments are turned off.
     """
     out, token = [], None
     while len(out) < n:
@@ -226,7 +227,10 @@ def comments(video_id: str, n: int = 100, order: str = "relevance") -> list[dict
             raise
         for thread in data.get("items", []):
             top = thread["snippet"]["topLevelComment"]["snippet"]
-            out.append({"text": top.get("textOriginal", ""), "likes": top.get("likeCount", 0),
+            comment_id = thread["snippet"]["topLevelComment"].get("id", thread.get("id", ""))
+            out.append({"comment_id": comment_id,
+                        "url": f"https://www.youtube.com/watch?v={video_id}&lc={comment_id}",
+                        "text": top.get("textOriginal", ""), "likes": top.get("likeCount", 0),
                         "replies": thread["snippet"].get("totalReplyCount", 0),
                         "published_at": top.get("publishedAt", "")})
         token = data.get("nextPageToken")
@@ -274,8 +278,8 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("uploads")
     s.add_argument("ref")
     s.add_argument("-n", type=int, default=10)
-    s = sub.add_parser("videos")
-    s.add_argument("ids", nargs="+")
+    for name in ("videos", "channels"):
+        sub.add_parser(name).add_argument("ids", nargs="+")
     for name in ("search", "creators"):
         s = sub.add_parser(name)
         s.add_argument("query")
@@ -301,6 +305,8 @@ def main(argv: list[str] | None = None) -> int:
             result = uploads(a.ref, a.n)
         elif a.cmd == "videos":
             result = videos(a.ids)
+        elif a.cmd == "channels":
+            result = channels(a.ids)
         elif a.cmd in ("search", "creators"):
             fn = search if a.cmd == "search" else creators
             result = fn(a.query, a.n, days=a.days, lang=a.lang, order=a.order, region=a.region)

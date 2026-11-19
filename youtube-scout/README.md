@@ -35,9 +35,10 @@ pip install "git+https://github.com/MarianoOG/Creative-AI-Tools#subdirectory=you
 | `yt channel REF` | A channel's profile and stats (`REF` = `UC…` id, `@handle` or channel URL) | 1 |
 | `yt uploads REF -n 10` | Its latest videos, newest first, with views, likes, comments | 3 |
 | `yt videos ID…` | Stats and details for given videos | 1 per 50 |
+| `yt channels ID…` | Profiles and stats for given channel ids | 1 per 50 |
 | `yt search "QUERY" [--days 14] [--lang es] [--order date] [--region MX] [-n 25]` | Videos for a query (one page, up to 50) | 100 |
 | `yt creators "QUERY" [same options]` | The channels behind that search, with the titles they matched | 101 |
-| `yt comments VIDEO_ID -n 100` | Top-level comment text, likes and reply count (no author names or ids) | 1 per 100 |
+| `yt comments VIDEO_ID -n 100` | Top-level comments: text, a link to each comment, likes, reply count (no author names or ids) | 1 per 100 |
 | `yt featured REF` | Channel ids the channel features on its page | 1 (+1 for a handle) |
 | `yt subscriptions REF` | Channel ids it subscribes to, if the list is public | 1 (+1 for a handle) |
 | `yt band MIN MAX < channels.json` | Channels with MIN–MAX subscribers, videos, not made for kids | 0 |
@@ -73,9 +74,9 @@ peers = yt.band(yt.creators("stop motion", days=14), me["subscribers"] // 3, me[
 - Official YouTube Data API only, `GET` requests only: it never posts, likes,
   subscribes or comments.
 - Your key stays in `.env` or the environment, never in the repo.
-- Nothing is written to disk. Comment text is returned without author names or
-  ids; if you save results, don't commit them, and refresh or delete YouTube data
-  within 30 days.
+- Nothing is written to disk. Comments come back without author names or ids,
+  but with a link, so you can go back and reply by hand. If you save results,
+  don't commit them, and refresh or delete YouTube data within 30 days.
 
 ## Tests
 
