@@ -1,0 +1,14 @@
+{
+  "name": "creative-ai-tools",
+  "description": "Claude plugins for the AI creative tools in this repository",
+  "owner": {
+    "name": "MarianoOG"
+  },
+  "plugins": [
+    {
+      "name": "youtube-scout",
+      "source": "./youtube-scout",
+      "description": "YouTube research with the official YouTube Data API: long-tail keywords, what to make next from viewer comments, similar-size collaborators and title checks. Ships the read-only yt tool."
+    }
+  ]
+}
