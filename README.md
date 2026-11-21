@@ -7,9 +7,16 @@ README, dependencies and virtual environment.
 | Tool | What it does | Shape |
 | --- | --- | --- |
 | [`world-builder/`](world-builder/README.md) | Build worlds with one visual style: characters, locations, objects, and episodes storyboarded scene by scene | FastAPI backend + Streamlit UI |
-| [`youtube-scout/`](youtube-scout/README.md) | Small read-only YouTube Data API tools: channels, uploads, search, creators, comments, featured channels and subscriptions, printed as JSON | One-file Python CLI (`yt`), built to be driven by a script, an agent or a Claude session |
+| [`youtube-scout/`](youtube-scout/README.md) | Small read-only YouTube Data API tools: channels, uploads, search, creators, comments, featured channels and subscriptions, printed as JSON | One-file Python CLI (`yt`) plus a Claude plugin with four YouTube research skills |
 
 Start with the README of the tool you want to use; each one explains its own
 setup. World Builder keeps its worlds in `data/assets/` at the repository root
 (gitignored). API keys live in each tool's `.env` (see its `.env.example`) and are
 never committed.
+
+## Claude plugins
+
+The repository is a Claude plugin marketplace (`.claude-plugin/marketplace.json`).
+Tools that ship skills are listed there; today that is `youtube-scout`. Add it with
+`claude plugin marketplace add MarianoOG/Creative-AI-Tools`, then
+`claude plugin install youtube-scout@creative-ai-tools`.

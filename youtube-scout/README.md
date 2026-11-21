@@ -28,6 +28,30 @@ Run it as `python yt.py ...`, or install the `yt` command anywhere:
 pip install "git+https://github.com/MarianoOG/Creative-AI-Tools#subdirectory=youtube-scout"
 ```
 
+## Claude plugin
+
+This folder is also a Claude plugin with four skills that drive `yt` for you
+(they ask for your channel, or use the one your own instructions name):
+
+| Skill | What it does | Default budget |
+| --- | --- | --- |
+| `youtube-keywords` | Long-tail YouTube search phrases for a channel, with what already ranks | ≤ 510 units |
+| `youtube-next-video` | 3–5 video ideas from what viewers ask in comments, with links to answer them | ≤ 520 units |
+| `youtube-collaborators` | 5–10 active channels of a similar size in the same topics | ≤ 520 units |
+| `youtube-title-check` | Whether a planned title has room to rank, plus alternatives | ≤ 320 units |
+
+Install it in Claude Code:
+
+```bash
+/plugin install youtube-scout --marketplace MarianoOG/Creative-AI-Tools
+```
+
+or add the marketplace first with `claude plugin marketplace add MarianoOG/Creative-AI-Tools`
+and install `youtube-scout@creative-ai-tools`. In the Claude app: Customize → Plugins →
+Add marketplace → `MarianoOG/Creative-AI-Tools`. The skills run the bundled `yt.py`, so
+nothing else needs installing; they only need `YOUTUBE_API_KEY`. Shared rules (quota,
+data rules) live in [`skills/foundations/youtube.md`](skills/foundations/youtube.md).
+
 ## Tools
 
 | Command | Returns | Quota units |
