@@ -9,6 +9,11 @@
       "name": "youtube-scout",
       "source": "./youtube-scout",
       "description": "YouTube research with the official YouTube Data API: long-tail keywords, what to make next from viewer comments, similar-size collaborators and title checks. Ships the read-only yt tool."
+    },
+    {
+      "name": "video-production",
+      "source": "./video-production",
+      "description": "Edit a video into a long-form (16:9) and a short-form (9:16) deliverable with a Shotcut project behind each: rough cut from raw footage, subtitles, safe areas, export and render checks."
     }
   ]
 }
