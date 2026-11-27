@@ -10,17 +10,7 @@ Every skill uses `yt`, a small read-only tool for the official YouTube Data API 
 - Otherwise run `python3 <plugin root>/yt.py …` (Python 3.10+, no dependencies), or install it once: `pip install "git+https://github.com/MarianoOG/Creative-AI-Tools#subdirectory=youtube-scout"`.
 - **Key:** `YOUTUBE_API_KEY`, from the environment or a `.env` file next to `yt.py`. If it is missing, stop and say so. Never ask for it in chat, never write it in a file.
 
-| Command | Gives | Units |
-|---|---|---|
-| `yt channel REF` | Profile and stats (REF = `@handle`, `UC…` id or channel URL) | 1 |
-| `yt uploads REF -n 15` | Latest videos with views, likes, comment counts | 3 |
-| `yt videos ID…` / `yt channels ID…` | Many videos / channels at once | 1 per 50 |
-| `yt search "phrase" [--days N] [--lang es] [--order date] -n 20` | Videos for a phrase | **100** |
-| `yt creators "phrase" [same options]` | The channels behind that search | **101** |
-| `yt comments VIDEO_ID -n 100` | Comments: text, link, likes, replies (no author names) | 1 per 100 |
-| `yt featured REF` | Channels it lists on its page (Featured channels) | 1 |
-| `yt subscriptions REF` | Channels it follows, only if public | 1 |
-| `yt band MIN MAX < channels.json` | Keep channels in a subscriber range, with videos, not made for kids | 0 |
+Commands, options and the units each one costs are in the Tools table of `README.md` at the plugin root.
 
 ## Quota
 

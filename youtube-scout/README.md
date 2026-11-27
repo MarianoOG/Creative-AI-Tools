@@ -33,12 +33,12 @@ pip install "git+https://github.com/MarianoOG/Creative-AI-Tools#subdirectory=you
 This folder is also a Claude plugin with four skills that drive `yt` for you
 (they ask for your channel, or use the one your own instructions name):
 
-| Skill | What it does | Default budget |
-| --- | --- | --- |
-| `youtube-keywords` | Long-tail YouTube search phrases for a channel, with what already ranks | ≤ 510 units |
-| `youtube-next-video` | 3–5 video ideas from what viewers ask in comments, with links to answer them | ≤ 520 units |
-| `youtube-collaborators` | 5–10 active channels of a similar size in the same topics | ≤ 520 units |
-| `youtube-title-check` | Whether a planned title has room to rank, plus alternatives | ≤ 320 units |
+| Skill | What it does |
+| --- | --- |
+| `youtube-keywords` | Long-tail YouTube search phrases for a channel, with what already ranks |
+| `youtube-next-video` | 3–5 video ideas from what viewers ask in comments, with links to answer them |
+| `youtube-collaborators` | 5–10 active channels of a similar size in the same topics |
+| `youtube-title-check` | Whether a planned title has room to rank, plus alternatives |
 
 Install it in Claude Code:
 
@@ -49,8 +49,8 @@ Install it in Claude Code:
 or add the marketplace first with `claude plugin marketplace add MarianoOG/Creative-AI-Tools`
 and install `youtube-scout@creative-ai-tools`. In the Claude app: Customize → Plugins →
 Add marketplace → `MarianoOG/Creative-AI-Tools`. The skills run the bundled `yt.py`, so
-nothing else needs installing; they only need `YOUTUBE_API_KEY`. Shared rules (quota,
-data rules) live in [`skills/foundations/youtube.md`](skills/foundations/youtube.md).
+nothing else needs installing; they only need `YOUTUBE_API_KEY`. Shared rules (quota and the
+budget per skill, data rules) live in [`skills/foundations/youtube.md`](skills/foundations/youtube.md).
 
 ## Tools
 
@@ -67,8 +67,8 @@ data rules) live in [`skills/foundations/youtube.md`](skills/foundations/youtube
 | `yt subscriptions REF` | Channel ids it subscribes to, if the list is public | 1 (+1 for a handle) |
 | `yt band MIN MAX < channels.json` | Channels with MIN–MAX subscribers, videos, not made for kids | 0 |
 
-Units used are printed to stderr after each command. The default quota is
-10,000 units a day; `search` and `creators` are the expensive ones.
+Units used are printed to stderr after each command. The daily quota and the
+budget per skill are in [`skills/foundations/youtube.md`](skills/foundations/youtube.md).
 
 ## Examples
 

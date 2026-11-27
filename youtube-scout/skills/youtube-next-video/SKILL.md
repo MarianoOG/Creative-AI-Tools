@@ -5,7 +5,7 @@ description: "Recommends what video to make next for a YouTube channel: finds it
 
 # YouTube: what to make next
 
-Read `youtube-scout:foundations` → `youtube.md` (running `yt`, quota, data rules) first and pick the channel per its standing rules. Budget: **≤ 520 units**. Say the estimate before starting.
+Read `youtube-scout:foundations` → `youtube.md` (running `yt`, quota, data rules) first and pick the channel per its standing rules. Budget: the one in the quota table of `youtube.md`. Say the estimate before starting.
 
 ## Step 1 — Source and topics
 

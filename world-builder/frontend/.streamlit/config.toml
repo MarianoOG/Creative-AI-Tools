@@ -1,5 +1,5 @@
 # Streamlit config for the World Builder UI.
-# Colors, type and shape follow the MarianoOG design system (dark grey, with light).
+# Colors, type and shape follow the project's design system (dark grey, with light).
 # Streamlit reads this file when you run `streamlit run app.py` from frontend/.
 
 [browser]

@@ -5,7 +5,7 @@ This repository is public. It holds AI tools for visual creative media (images a
 ## Admission
 
 - **Visual media only.** A tool or skill is about making, editing or analysing images or video, or about the platforms that carry them. Anything else belongs elsewhere.
-- **Nothing private.** No personal names, accounts, channel or project IDs, file paths from a personal machine, brand or business strategy, or employer information. A reader who has never heard of the author must be able to use every file as it is.
+- **Nothing private.** No personal names, accounts, channel or project IDs, file paths from a personal machine, brand or business strategy, or employer information. The one exception is the repository owner's public GitHub handle, in author fields and install commands. A reader who has never heard of the author must be able to use every file as it is.
 - **Method, not identity.** Keep how something is done (specs, steps, rules of thumb). Leave out what one person decided about their own work. When a skill needs the user's own context, it asks for it or reads what the user's instructions name, as `youtube-scout` does.
 
 ## Plugins

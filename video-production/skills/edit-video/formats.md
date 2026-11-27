@@ -13,7 +13,7 @@ Assume YouTube is the target: long-form on YouTube, short-form on YouTube Shorts
 | Subtitles | **Sidecar `.srt`** by default, burned in only on request | **Burned in**, always |
 | Safe area | Text inside the inner 90% (title-safe). Lower-thirds sit above the bottom 10% | Keep text and key action out of the top 12% (≈230 px), the bottom 22% (≈420 px) and the right 120 px. These cover the UI of Shorts, Reels and TikTok, so one file works on all three |
 | Subtitle style | Lato 48–56 px, white with outline, bottom-centre, max 2 lines, ~42 characters per line | Lato Heavy ~66 px, white, 3 px black outline, on a ~55% black box. Max 3 lines, ~22 characters per line |
-| Pace | Let it breathe. Title cards for chapters | One idea per subtitle line. Change shot or framing every 2–6 s |
+| Pace | Let it breathe | One idea per subtitle line. Change shot or framing every 2–6 s |
 | Ending | Can close with a call to action card | Ends cleanly; a loop back to the hook works well |
 
 ## Long-form notes
