@@ -93,3 +93,15 @@ def test_older_locations_keep_their_first_image_as_base(monkeypatch):
     assert "inputs" not in sent[0] and (sent[0]["width"], sent[0]["height"]) == (3072, 1024)
     assert len(sent[1]["inputs"]["referenceImages"]) == 1
     assert base64.b64decode(sent[1]["inputs"]["referenceImages"][0].split(",", 1)[1])[:2] == b"\xff\xd8"
+
+
+def test_each_video_model_refuses_lengths_it_cannot_render(tmp_path):
+    import pytest
+
+    from app.assets import video
+
+    frame = tmp_path / "frame.jpg"
+    with pytest.raises(ValueError, match="at most|not 15"):
+        video.generate_video("w", "s-video", "A shot.", "flat", frame, tmp_path, duration=15,
+                             model="gemini-omni-flash-1.2")
+    assert video.price(10, "gemini-omni-flash-1.2") == 0.7

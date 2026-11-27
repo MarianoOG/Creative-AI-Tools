@@ -209,11 +209,14 @@ wait for the render and return the result. Each image is rendered by one
   (the scene's heading and summary, and the shot's action; not its dialogue).
   Regenerating points `final` at the new image.
 - **shot videos**: `POST /worlds/{world}/episodes/{episode}/shots/{shot}/video`
-  animates the shot's final frame with Runware's MiniMax H3 Fast (`minimax:h3@fast`) at 768p, for the
-  shot's clip length. The frame is sent as the first frame; the prompt is the shot's text (as for its
+  animates the shot's final frame with one of Runware's video models, for the shot's clip length:
+  MiniMax H3 Fast (`minimax:h3@fast`) at 768p, 5 to 15 s, or Gemini Omni Flash 1.2
+  (`google:gemini@omni-flash-1.2`) at 720p, up to 10 s from a frame (it refuses a longer shot). The body's
+  `model` picks it (a key of `video.VIDEO_MODELS`); left out, the episode's last one is used, and it is
+  kept on the episode (`video_model` in `episode.json`, also set with `PATCH`). The frame is sent as the first frame; the prompt is the shot's text (as for its
   final frame), the world's style, and a direction to keep the frame's designs and style, to move the
   camera only as the action says (still when it says nothing), and to have no dialogue or voices. The task runs async and is polled until done
   (up to 9 minutes). It refuses a shot with no final frame. The clip is saved as
-  `{uuid8}-{shot id}-video.mp4` in `shots/`, and its billed cost is logged (the list price,
-  $0.08/s, marked estimated, if Runware reports none). Regenerating a frame leaves the old clip
+  `{uuid8}-{shot id}-video.mp4` in `shots/`, and its billed cost is logged (the model's list price,
+  $0.08/s or $0.07/s, marked estimated, if Runware reports none). Regenerating a frame leaves the old clip
   in place until the video is regenerated too.

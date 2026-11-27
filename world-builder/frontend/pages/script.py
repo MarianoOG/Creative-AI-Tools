@@ -28,7 +28,7 @@ import streamlit as st
 import api
 from shared.state import notify, show_notice
 from shared.story import asset_names, episode_url, excerpt, pick_episode, reference_label
-from shared.ui import plural
+from shared.ui import plural, top_bar, view_picker
 from shared.worlds import render_world_switcher
 
 EDITOR_HEIGHT = 640
@@ -43,19 +43,6 @@ PAGE_CSS = """
 <style>
 /* Screenplays are written in a monospaced font; this page's only text area is the editor. */
 .stTextArea textarea { font-family: 'Courier Prime', 'Courier New', monospace; font-size: 15px; line-height: 1.5; }
-/* The page has no title, so the bar starts near the top. */
-.stMainBlockContainer { padding-top: 3.5rem; }
-/* The bar stays on screen, under Streamlit's header, as the page scrolls. Its wrapper is what sticks,
-   as the bar alone is exactly as tall as the wrapper and would have no room to move. */
-[data-testid="stLayoutWrapper"]:has(> .st-key-script_bar) { position: sticky; top: 3.75rem; z-index: 99; }
-/* A band above it fills the gap up to the top of the window, so text does not show there while scrolling. */
-[data-testid="stLayoutWrapper"]:has(> .st-key-script_bar)::before {
-    content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 4rem; background-color: #0e0e10; }
-.st-key-script_bar { background-color: #0e0e10; padding: 0.5rem 0; border-bottom: 1px solid #2c2c30; }
-/* The picked view reads brightest, like the selected tab elsewhere. */
-.st-key-script_bar [data-testid="stBaseButton-segmented_controlActive"],
-.st-key-script_bar [data-testid="stBaseButton-segmented_controlActive"] p {
-    background-color: #ededee; color: #0e0e10; border-color: #ededee; }
 </style>
 """
 
@@ -211,14 +198,6 @@ def unsaved_text(world: str, episode: str, view: Dict) -> str:
     return st.session_state.drafts.get((world, episode), view['text'])
 
 
-def keep_view() -> None:
-    """Remember the picked view; clicking the selected one again keeps it (it would otherwise unselect it)."""
-    if st.session_state.script_view_pick is None:
-        st.session_state.script_view_pick = st.session_state.script_view
-    else:
-        st.session_state.script_view = st.session_state.script_view_pick
-
-
 def render_checks(lint: List[Dict], problems: List[Dict], text: str, column) -> None:
     """One button that opens the syntax problems (in the editor's text) and the references the world lacks (saved)."""
     count = len(lint) + len(problems)
@@ -242,15 +221,10 @@ def render_bar(world: str, episode: str, view: Dict, text: str, preview: Dict) -
     """The view picker, what saving would change, the problems, Save and Discard: one row that stays on screen."""
     summary = preview['summary']
     unsaved = text != view['text']
-    with st.container(key="script_bar"):
+    with top_bar():
         view_col, changes_col, checks_col, save_col, discard_col = st.columns(
             [3.2, 4, 1.6, 1.1, 1.1], vertical_alignment='center')
-        if st.session_state.get('script_view_pick') is None:
-            st.session_state.script_view_pick = st.session_state.script_view
-        view_col.segmented_control(
-            "View", list(VIEWS), format_func=lambda name: f"{VIEWS[name]} {name}", key='script_view_pick',
-            on_change=keep_view, label_visibility='collapsed',
-        )
+        view_picker(VIEWS, 'script_view', view_col)
         if summary['changed']:
             changes_col.markdown(f"**Unsaved:** {changes_line(summary)}")
         elif unsaved:

@@ -1,4 +1,8 @@
-"""World: the current world's characters, locations and objects (each by its preferred image), and its episodes, one tab each."""
+"""World: the current world's characters, locations and objects (each by its preferred image), and its episodes.
+
+The top bar (which stays on screen as the page scrolls) picks one of the four
+views, says what the world has cost so far, and has the view's New button.
+"""
 
 from __future__ import annotations
 
@@ -11,10 +15,13 @@ from PIL import Image
 
 import api
 from shared.state import notify, show_notice
-from shared.ui import grid, open_asset, open_script, plural, show_errors
+from shared.ui import grid, open_asset, open_script, plural, show_errors, top_bar, view_picker
 from shared.worlds import render_world_switcher
 
 ASSET_TABS = {'character': "Characters", 'location': "Locations", 'object': "Objects"}
+#: The views, with their icons, in the order the bar shows them.
+VIEWS = {"Characters": ":material/person:", "Locations": ":material/landscape:", "Objects": ":material/category:",
+         "Episodes": ":material/movie:"}
 THUMBNAIL = (960, 540)
 
 
@@ -29,7 +36,7 @@ def thumbnail(path: str, mtime: float) -> str:
 
 
 def stay_on(tab: str) -> None:
-    """Reopen ``tab`` after the next rerun, which would otherwise show the first one."""
+    """Keep showing ``tab`` (a view's name) after the next rerun."""
     st.session_state.world_tab = tab
 
 
@@ -65,7 +72,7 @@ def render_tile(world: str, asset: dict) -> None:
 
 def render_new_asset(world: str, asset_type: str) -> None:
     """Create an asset (name and description only) and open it on the Asset page to generate its images."""
-    with st.popover(f"New {asset_type}", icon=":material/add:", type="primary"):
+    with st.popover(f"New {asset_type}", icon=":material/add:", type="primary", width='stretch'):
         name = st.text_input("Name", placeholder=f"{asset_type}_name", key=f"new_name_{asset_type}",
                              help="Used in scripts. Spaces and punctuation become underscores.")
         description = st.text_area("Description", key=f"new_description_{asset_type}", height=120)
@@ -79,7 +86,6 @@ def render_new_asset(world: str, asset_type: str) -> None:
 
 
 def render_assets(world: str, asset_type: str) -> None:
-    render_new_asset(world, asset_type)
     assets = api.get("/assets", world=world, asset_type=asset_type)['assets']
     if not assets:
         st.info(f"No {asset_type}s in {world} yet.")
@@ -91,7 +97,7 @@ def render_assets(world: str, asset_type: str) -> None:
 
 def render_new_episode(world: str) -> None:
     """Create an episode (title, synopsis and aspect ratio) and open it on the Script page to write its scenes."""
-    with st.popover("New episode", icon=":material/add:", type="primary"):
+    with st.popover("New episode", icon=":material/add:", type="primary", width='stretch'):
         title = st.text_input("Title", key="new_episode_title",
                               help="Also names the episode's folder. Spaces and punctuation become underscores.")
         synopsis = st.text_area("Synopsis", key="new_episode_synopsis", height=120)
@@ -108,12 +114,13 @@ def render_new_episode(world: str) -> None:
 
 
 def render_episodes(world: str) -> None:
-    render_new_episode(world)
+    """Every episode, newest first."""
     episodes = api.get(f"/worlds/{world}/episodes")['episodes']
     if not episodes:
         st.info(f"No episodes in {world} yet.")
-    for episode in episodes:
-        st.divider()
+    for number, episode in enumerate(episodes):
+        if number:
+            st.divider()
         info_col, open_col = st.columns([4, 1])
         info_col.markdown(f"### {episode['title']}")
         info_col.caption(f"`{episode['name']}` · {episode['scene_count']} scenes · {episode['shot_count']} shots")
@@ -132,30 +139,33 @@ def render_episodes(world: str) -> None:
                 notify('success', f"Deleted episode **{episode['name']}**.")
 
 
-def render_cost_summary(world: str) -> None:
+def cost_summary(world: str) -> str:
     costs = api.get(f"/worlds/{world}/costs")
     if not costs['entries']:
-        return
-    note = " (estimated for renders made before everything went through Runware)" if any(
-        e['estimated'] for e in costs['entries']
-    ) else ""
-    st.caption(f"Spent on renders in **{world}** so far: **${costs['total']:.2f}**{note}.")
+        return "Nothing spent on renders yet."
+    note = " (some estimated)" if any(e['estimated'] for e in costs['entries']) else ""
+    return f"Spent on renders: **\\${costs['total']:.2f}**{note}"
 
 
 def main() -> None:
     world, _ = render_world_switcher()
-
-    st.title(world)
-    render_cost_summary(world)
+    with top_bar():
+        view_col, cost_col, new_col = st.columns([5, 3, 1.6], vertical_alignment='center')
+        view = view_picker(VIEWS, 'world_tab', view_col)
+        cost_col.caption(cost_summary(world),
+                         help="Estimated: renders made before everything went through Runware, or that Runware "
+                              "reported no cost for, are logged at list price.")
+        with new_col:
+            if view == "Episodes":
+                render_new_episode(world)
+            else:
+                render_new_asset(world, next(key for key, name in ASSET_TABS.items() if name == view))
     show_notice()
 
-    tab_names = [*ASSET_TABS.values(), "Episodes"]
-    *asset_tabs, episodes_tab = st.tabs(tab_names, default=st.session_state.get('world_tab'))
-    for tab, asset_type in zip(asset_tabs, ASSET_TABS):
-        with tab:
-            render_assets(world, asset_type)
-    with episodes_tab:
+    if view == "Episodes":
         render_episodes(world)
+    else:
+        render_assets(world, next(key for key, name in ASSET_TABS.items() if name == view))
 
 
 main()

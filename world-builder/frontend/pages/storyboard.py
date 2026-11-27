@@ -1,5 +1,9 @@
 """Storyboard: an episode's final frames in a grid, their generation, and a zip of them all.
 
+Like the Script page, the episode, the model and Export all frames are in the
+sidebar, and a bar at the top (which stays on screen as the page scrolls) says
+how many frames are done and has Generate for the missing ones.
+
 Two frames per row, each with the shot's number and words under it, a warning
 when the shot changed after its frame was made, and a Generate or Regenerate
 button with its price (this world's average logged cost for the model, else a
@@ -22,7 +26,7 @@ from shared.state import show_notice
 from shared.story import (
     build_zip, episode_url, excerpt, export_files, generate_shots, pick_episode, shot_label, shots_in_order,
 )
-from shared.ui import grid
+from shared.ui import grid, plural, top_bar
 from shared.worlds import render_world_switcher
 
 
@@ -71,51 +75,58 @@ def render_grid(world: str, episode: str, script: Dict, price: Optional[float]) 
     return clicked
 
 
+def render_sidebar(world: str, episode: str, script: Dict, options: Dict) -> str:
+    """The model (saved on the episode as soon as it changes) and Export all frames. Returns the model."""
+    providers = options['final_providers']
+    key = f"final_provider_{world}_{episode}"
+    with st.sidebar:
+        provider = st.selectbox(
+            "Model", providers, index=providers.index(script['final_provider']),
+            format_func=options['providers'].get, key=key, help="Renders every frame generated from here.",
+            on_change=lambda: api.patch(episode_url(world, episode), json={'final_provider': st.session_state[key]}),
+        )
+        files = export_files(script, 'final_path')
+        # No "regenerate all": re-rendering every frame at once is too expensive to offer. One at a time only.
+        st.download_button(
+            "Export all frames", data=build_zip(files) if files else b"", file_name=f"{world}_{episode}.zip",
+            mime="application/zip", icon=":material/download:", width='stretch', disabled=not files,
+            help="A zip of every frame, named in story order." if files else "No frames yet.",
+        )
+    return provider
+
+
 def main() -> None:
     world, _ = render_world_switcher()
-    st.title("Storyboard")
-    episode = pick_episode(world)
+    episode = pick_episode(world, st.sidebar)
     if not episode:
         return
     script = api.get(episode_url(world, episode))
-    show_notice()
+    options = api.options()
+    provider = render_sidebar(world, episode, script, options)
     shots = shots_in_order(script)
+    price = frame_price(api.get(f"/worlds/{world}/costs")['entries'], provider, options['price_estimates'])
+    missing = [(shot_label(scene, shot), shot['id']) for scene, shot in shots if not shot.get('final_path')]
+    stale = sum(1 for _, shot in shots if shot['final_stale'])
+
+    generate_all = False
+    with top_bar():
+        status_col, action_col = st.columns([3, 1.4], vertical_alignment='center')
+        status = [f"{len(shots) - len(missing)} of {plural(len(shots), 'frame')} done"]
+        if stale:
+            status.append(f"{stale} made before their shot changed: regenerate them one at a time below")
+        status_col.caption(" · ".join(status) if shots else "No shots yet.")
+        total = price_label(price * len(missing) if price is not None else None)
+        generate_all = action_col.button(
+            f"Generate {plural(len(missing), 'frame')} · {total}" if missing else "Every shot has a frame",
+            type="primary", width='stretch', disabled=not missing, icon=":material/auto_awesome:",
+        )
+    show_notice()
     if not shots:
         st.info("This episode has no shots yet. Write them on the Script page.")
         return
     if script['needs_ids']:
         st.info("Some shots were added outside the app and are not shown. Reprocess the file on the Script page.")
 
-    options = api.options()
-    providers = options['final_providers']
-    model_col, action_col = st.columns([3, 2], vertical_alignment='bottom')
-    provider = model_col.selectbox(
-        "Model", providers, index=providers.index(script['final_provider']),
-        format_func=options['providers'].get, key=f"final_provider_{world}_{episode}",
-    )
-    price = frame_price(api.get(f"/worlds/{world}/costs")['entries'], provider, options['price_estimates'])
-    missing = [(shot_label(scene, shot), shot['id']) for scene, shot in shots if not shot.get('final_path')]
-
-    def batch_price(count: int) -> str:
-        return price_label(price * count if price is not None else None)
-
-    generate_all = False
-    with action_col:
-        if missing:
-            generate_all = st.button(
-                f"Generate {len(missing)} frame(s) · {batch_price(len(missing))}", type="primary", width='stretch'
-            )
-        else:
-            # No "regenerate all": re-rendering every frame at once is too expensive to offer. One at a time only.
-            st.download_button(
-                "Export all frames", data=build_zip(export_files(script, 'final_path')), file_name=f"{world}_{episode}.zip",
-                mime="application/zip", type="primary", icon=":material/download:", width='stretch',
-            )
-
-    st.divider()
-    stale = sum(1 for _, shot in shots if shot['final_stale'])
-    if stale:
-        st.caption(f"{stale} frame(s) were made before their shot changed. Regenerate them one at a time below.")
     clicked = render_grid(world, episode, script, price)
     to_generate = missing if generate_all else clicked
     if to_generate:
