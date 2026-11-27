@@ -24,7 +24,7 @@ from pydantic import BaseModel
 from app.assets import library, story, video
 from app.assets.generation import (
     ASPECT_RATIOS, DEFAULT_FINAL_PROVIDER, DEFAULT_PROVIDER, FINAL_PROVIDERS, PRICE_ESTIMATES,
-    PROVIDERS, generate_image, model_key,
+    PROVIDERS, generate_image,
 )
 from app.assets.prompt_manager import (
     ASSET_DIRS, LEGACY_VIEW_CHANGES, STYLES, build_prompt, variation_description,
@@ -75,8 +75,7 @@ def _check(world: str, asset_type: str, allowed=tuple(ASSET_DIRS)) -> None:
 
 
 def check_provider(provider: str) -> str:
-    """The model key for ``provider`` (older names such as ``openai`` are translated), or 422."""
-    provider = model_key(provider)
+    """``provider`` if it is a model key, or 422."""
     if provider not in PROVIDERS:
         raise HTTPException(422, f"provider must be one of {sorted(PROVIDERS)}")
     return provider

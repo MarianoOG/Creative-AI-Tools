@@ -55,22 +55,13 @@ MODELS: Dict[str, Dict[str, Any]] = {
 }
 #: The name each model shows in the forms.
 PROVIDERS = {key: model["label"] for key, model in MODELS.items()}
-DEFAULT_PROVIDER = "gpt-image-sunburst"
-#: What episodes and variations made before everything went through Runware called their model.
-LEGACY_PROVIDERS = {
-    "openai": "gpt-image-sunburst", "gemini": "nano-banana", "runware": "flux-3-klein", "flux-klein": "flux-3-klein",
-}
+DEFAULT_PROVIDER = "nano-banana"
 #: Rough USD per final frame (1K), shown on the Storyboard until the world's cost log has real ones.
 PRICE_ESTIMATES = {"gpt-image-sunburst": 0.07, "gpt-image-flare": 0.17, "nano-banana": 0.034, "flux-3": 0.048,
                    "flux-3-klein": 0.004}
 #: The models a final frame can use (all of them), and the default one.
 FINAL_PROVIDERS = tuple(PROVIDERS)
 DEFAULT_FINAL_PROVIDER = "nano-banana"
-
-
-def model_key(provider: Optional[str]) -> Optional[str]:
-    """A model key, translating the provider names older files used (``openai``, ``gemini``, ``runware``)."""
-    return LEGACY_PROVIDERS.get(provider or "", provider)
 
 
 #: Friendly name -> ratio. Locations always render as ``panorama``.
@@ -205,12 +196,11 @@ def generate_image(
 ) -> Path:
     """Render one image (an asset, or a shot's ``"final"`` frame) with one model and save it as ``{uuid8}-{label}`` in ``directory``.
 
-    ``provider`` is a model key (see :data:`MODELS`; older names are translated).
+    ``provider`` is a model key (see :data:`MODELS`).
     ``clause`` says how ``references`` are used (see ``build_prompt``). Raises
     if Runware fails; nothing is written then. What it billed is appended to
     ``world``'s cost log.
     """
-    provider = model_key(provider)
     if provider not in MODELS:
         raise ValueError(f"provider must be one of {sorted(MODELS)}")
     references = list(references)[: MODELS[provider]["max_references"]]

@@ -165,7 +165,7 @@ def test_converts_an_episode_from_before_fountain(world):
         }],
     }))
     view = story.read_episode(world, "old")
-    assert view["title"] == "Old one" and view["aspect_ratio"] == "square" and view["final_provider"] == "flux-3-klein"
+    assert view["title"] == "Old one" and view["aspect_ratio"] == "square" and view["final_provider"] == "nano-banana"
     scene = view["scenes"][0]
     assert scene["heading"] == "the kitchen" and scene["summary"] == "Mara arrives." and scene["locations"] == ["kitchen"]
     first, second = scene["shots"]

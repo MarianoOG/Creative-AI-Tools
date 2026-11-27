@@ -42,7 +42,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from app.assets import fountain, sync, tagging
-from app.assets.generation import ASPECT_RATIOS, DEFAULT_FINAL_PROVIDER, FINAL_PROVIDERS, model_key
+from app.assets.generation import ASPECT_RATIOS, DEFAULT_FINAL_PROVIDER, FINAL_PROVIDERS
 from app.assets.video import DEFAULT_DURATION, DURATIONS
 from app.assets.worlds import (
     child_dir, existing_dir, move_to_deleted, new_child_dir, read_world, subfolders, world_dir, write_json,
@@ -108,7 +108,7 @@ def _new_id(taken: set) -> str:
 
 
 def _clean_meta(raw: Dict) -> Dict:
-    final_provider = model_key(raw.get("final_provider"))
+    final_provider = raw.get("final_provider")
     return {
         "aspect_ratio": raw.get("aspect_ratio") if raw.get("aspect_ratio") in ASPECT_RATIOS else "landscape",
         "final_provider": final_provider if final_provider in FINAL_PROVIDERS else DEFAULT_FINAL_PROVIDER,
@@ -537,7 +537,6 @@ def set_settings(world: str, episode: str, aspect_ratio: Optional[str] = None,
                 raise ValueError(f"aspect_ratio must be one of {list(ASPECT_RATIOS)}")
             meta["aspect_ratio"] = aspect_ratio
         if final_provider is not None:
-            final_provider = model_key(final_provider)
             if final_provider not in FINAL_PROVIDERS:
                 raise ValueError(f"final_provider must be one of {list(FINAL_PROVIDERS)}")
             meta["final_provider"] = final_provider

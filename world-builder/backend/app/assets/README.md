@@ -3,9 +3,9 @@
 Four kinds of image, each rendered by one model, always in the world's style.
 Every model goes through Runware with one key: OpenAI GPT-Image-2.6 Sunburst
 (`gpt-image-sunburst`) or Flare (`gpt-image-flare`), Google Nano Banana 2.1
-(`nano-banana`), or FLUX 3 Image (`flux-3`) or FLUX 3 Image Klein (`flux-3-klein`).
-Files from before keep the older names (`openai`, `gemini`, `runware`,
-`flux-klein`); they are read as those models (Flux 2 Klein as FLUX 3 Klein).
+(`nano-banana`, the default), or FLUX 3 Image (`flux-3`) or FLUX 3 Image Klein
+(`flux-3-klein`). Older names (`openai`, `gemini`, `runware`) stay in old files
+only as a record: an episode saved with one falls back to the default model.
 
 
 | Type | What it renders | References are treated as |

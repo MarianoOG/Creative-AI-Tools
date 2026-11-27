@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from app.assets import library, story, video
 from app.assets.generation import (
-    ASPECT_RATIOS, FINAL_PROVIDERS, FINAL_QUALITY, FINAL_RESOLUTION, generate_image, model_key,
+    ASPECT_RATIOS, FINAL_PROVIDERS, FINAL_QUALITY, FINAL_RESOLUTION, generate_image,
 )
 from app.assets.prompt_manager import ASSET_DIRS
 from app.assets.worlds import read_style, read_world
@@ -232,7 +232,7 @@ def generate_shot(world: str, episode: str, shot: str, body: Optional[FinalFrame
     style = read_style(world)
     if not style:
         raise HTTPException(422, "This world has no style yet - write one in Manage worlds.")
-    provider = model_key(body.provider) or view["final_provider"]
+    provider = body.provider or view["final_provider"]
     if provider not in FINAL_PROVIDERS:
         raise HTTPException(422, f"a final frame's provider must be one of {list(FINAL_PROVIDERS)}")
     references, labels = _final_references(world, scene_data, shot_data)

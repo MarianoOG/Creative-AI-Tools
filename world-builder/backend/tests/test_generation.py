@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from PIL import Image
 
 from app.assets import generation, library
-from app.assets.generation import image_size, model_key, runware_task
+from app.assets.generation import image_size, runware_task
 from app.assets.prompt_manager import build_prompt
 from app.assets.worlds import create_world
 from app.main import app
@@ -45,12 +45,6 @@ def test_tasks_per_model():
     assert flux["model"] == "bfl:flux@3-image" and (flux["width"], flux["height"]) == (2736, 1536)
 
 
-def test_older_model_names_are_translated():
-    assert [model_key(name) for name in ("openai", "gemini", "runware", "flux-klein", "nano-banana", None)] == [
-        "gpt-image-sunburst", "nano-banana", "flux-3-klein", "flux-3-klein", "nano-banana", None,
-    ]
-
-
 def test_location_prompts():
     first = build_prompt("location", "A forest.", "flat")
     assert "panoramic" in first and "3:1" in first
@@ -69,7 +63,7 @@ def test_locations_render_as_panoramas(monkeypatch):
     world = create_world(f"w{uuid.uuid4().hex[:8]}", style="flat")
     client.post("/assets", json={"world": world, "asset_type": "location", "name": "forest", "description": "A forest."})
 
-    form = {"world": world, "asset_type": "location", "name": "forest", "provider": "openai"}
+    form = {"world": world, "asset_type": "location", "name": "forest", "provider": "gpt-image-sunburst"}
     first = client.post("/assets/variations", data={**form, "variation": "ignored"}).json()["asset"]
     assert [v["name"] for v in first["variations"]] == ["panorama"] and first["preferred"] == "panorama"
     assert first["variations"][0]["provider"] == "gpt-image-sunburst"
@@ -93,7 +87,7 @@ def test_older_locations_keep_their_first_image_as_base(monkeypatch):
         library.put_variation(world, "location", "market",
                               {"name": name, "description": "", "provider": "gemini", "image": old.name, "references": []})
 
-    result = client.post("/assets/regenerate", json={"world": world, "asset_type": "location", "name": "market"}).json()
+    result = client.post("/assets/regenerate", json={"world": world, "asset_type": "location", "name": "market", "provider": "gpt-image-sunburst"}).json()
     assert result["warning"] is None and len(sent) == 2
     # The base (establishing) renders first, from the description, as a panorama; reverse is drawn from it.
     assert "inputs" not in sent[0] and (sent[0]["width"], sent[0]["height"]) == (3072, 1024)
