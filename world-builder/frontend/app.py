@@ -10,7 +10,7 @@ from shared.state import init_session_state
 st.set_page_config(page_title="World Builder", page_icon=":material/public:", layout="wide")
 init_session_state()
 
-# What .streamlit/config.toml cannot set (MarianoOG design system). Streamlit
+# What .streamlit/config.toml cannot set (the project's design system). Streamlit
 # always draws primary-button text in white, so the near-white `primary` fill
 # with its dark `on-primary` label, and the selected tab, are styled here.
 st.html(
