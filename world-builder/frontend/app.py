@@ -53,6 +53,16 @@ st.html(
         border-color: #ededee;
         color: #0e0e10;
     }
+    /* An episode card's synopsis: at most three lines, and always three lines tall so cards line up */
+    .synopsis {
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        min-height: 4.5em;
+        line-height: 1.5;
+        margin-bottom: 0.5rem;
+    }
     /* Pages start with their top bar instead of a title, so less space above it */
     .stMainBlockContainer {
         padding-top: 3.5rem;

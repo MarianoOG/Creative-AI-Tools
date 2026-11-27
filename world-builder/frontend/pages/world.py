@@ -7,6 +7,7 @@ views, says what the world has cost so far, and has the view's New button.
 from __future__ import annotations
 
 import base64
+import html
 from io import BytesIO
 from urllib.parse import urlencode
 
@@ -40,8 +41,19 @@ def stay_on(tab: str) -> None:
     st.session_state.world_tab = tab
 
 
+def render_actions(key: str, edit, confirm_text: str, delete_label: str, delete) -> None:
+    """One row: Edit (wide) and a trash button that opens a popover to confirm the delete."""
+    edit_col, delete_col = st.columns([3, 1])
+    if edit_col.button("Edit", key=f"edit_{key}", width='stretch'):
+        edit()
+    with delete_col.popover(":material/delete:", width='stretch', help="Delete"):
+        st.warning(confirm_text)
+        if st.button(delete_label, icon=":material/delete:", key=f"delete_{key}"):
+            delete()
+
+
 def render_tile(world: str, asset: dict) -> None:
-    """The preferred image (a link to the Asset page), the name, Edit, and the details with Delete."""
+    """The preferred image (a link to the Asset page), the name with its variation count, Edit and Delete."""
     asset_type, name = asset['asset_type'], asset['name']
     preferred = next((v for v in asset['variations'] if v['name'] == asset['preferred']), None)
     if preferred:
@@ -53,21 +65,17 @@ def render_tile(world: str, asset: dict) -> None:
         )
     else:
         st.info("No images yet.")
-    name_col, edit_col = st.columns([3, 1])
-    name_col.markdown(f"**{name}**")
-    if edit_col.button("Edit", key=f"edit_{asset_type}_{name}", width='stretch'):
-        open_asset(asset_type, name)
-    with st.expander("Details"):
-        if asset['description']:
-            st.write(asset['description'])
-        st.caption(plural(len(asset['variations']), 'variation')
-                   + (f" · preferred: {asset['preferred']}" if asset['preferred'] else ""))
-        confirmed = st.checkbox("Confirm delete", key=f"confirm_{asset_type}_{name}")
-        if st.button("Delete", icon=":material/delete:", disabled=not confirmed, key=f"delete_{asset_type}_{name}",
-                     width='stretch', help="Removes it from the world. Its image files stay in the data folder."):
-            stay_on(ASSET_TABS[asset_type])
-            api.delete("/assets", world=world, asset_type=asset_type, name=name)
-            notify('success', f"Removed **{name}** from {world}.")
+    st.markdown(f"**{name}** &nbsp;:gray[{plural(len(asset['variations']), 'variation')}]")
+
+    def delete() -> None:
+        stay_on(ASSET_TABS[asset_type])
+        api.delete("/assets", world=world, asset_type=asset_type, name=name)
+        notify('success', f"Removed **{name}** from {world}.")
+
+    render_actions(
+        f"{asset_type}_{name}", lambda: open_asset(asset_type, name),
+        f"Removes **{name}** from the world. Its image files stay in the data folder.", f"Delete {asset_type}", delete,
+    )
 
 
 def render_new_asset(world: str, asset_type: str) -> None:
@@ -113,30 +121,34 @@ def render_new_episode(world: str) -> None:
                 open_script(created)
 
 
+def render_episode(world: str, episode: dict) -> None:
+    """A compact card: title, counts, the synopsis cut to three lines, Edit and Delete."""
+    name = episode['name']
+    with st.container(border=True):
+        st.markdown(f"**{episode['title']}**")
+        st.caption(f"`{name}` · {plural(episode['scene_count'], 'scene')} · {plural(episode['shot_count'], 'shot')}")
+        st.markdown(f'<div class="synopsis">{html.escape(episode["synopsis"] or "")}</div>', unsafe_allow_html=True)
+
+        def delete() -> None:
+            stay_on("Episodes")
+            api.delete(f"/worlds/{world}/episodes/{name}")
+            notify('success', f"Deleted episode **{name}**.")
+
+        render_actions(
+            f"episode_{name}", lambda: open_script(name),
+            f"Removes **{name}**, its {plural(episode['scene_count'], 'scene')} and every shot image from the app. "
+            "Its folder is kept, hidden, in the data folder.", "Delete episode", delete,
+        )
+
+
 def render_episodes(world: str) -> None:
-    """Every episode, newest first."""
+    """Every episode, newest first, three to a row."""
     episodes = api.get(f"/worlds/{world}/episodes")['episodes']
     if not episodes:
         st.info(f"No episodes in {world} yet.")
-    for number, episode in enumerate(episodes):
-        if number:
-            st.divider()
-        info_col, open_col = st.columns([4, 1])
-        info_col.markdown(f"### {episode['title']}")
-        info_col.caption(f"`{episode['name']}` · {episode['scene_count']} scenes · {episode['shot_count']} shots")
-        if episode['synopsis']:
-            info_col.write(episode['synopsis'])
-        if open_col.button("Open script", key=f"open_{episode['name']}", width='stretch'):
-            open_script(episode['name'])
-        with open_col.popover("Delete", width='stretch'):
-            st.warning(
-                f"All {episode['scene_count']} scenes and every shot image in **{episode['name']}** "
-                "are removed from the app (the folder is kept, hidden, in the data folder)."
-            )
-            if st.button("Delete episode", icon=":material/delete:", key=f"delete_episode_{episode['name']}"):
-                stay_on("Episodes")
-                api.delete(f"/worlds/{world}/episodes/{episode['name']}")
-                notify('success', f"Deleted episode **{episode['name']}**.")
+    for column, episode in grid(episodes):
+        with column:
+            render_episode(world, episode)
 
 
 def cost_summary(world: str) -> str:
