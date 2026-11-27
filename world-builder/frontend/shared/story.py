@@ -1,4 +1,4 @@
-"""Helpers shared by the Script and Storyboard pages: pickers, the scene editor and shot rendering."""
+"""Helpers shared by the Script, Storyboard and Video pages: pickers, shot settings and shot rendering."""
 
 from __future__ import annotations
 
@@ -25,7 +25,18 @@ def episode_url(world: str, episode: str) -> str:
 
 
 def shots_in_order(script: Dict) -> List[Tuple[Dict, Dict]]:
-    return [(scene, shot) for scene in script['scenes'] for shot in scene['shots']]
+    """Every shot that has an id (a shot added outside the app has none until the script is saved or reprocessed)."""
+    return [(scene, shot) for scene in script['scenes'] for shot in scene['shots'] if shot['id']]
+
+
+def shot_label(scene: Dict, shot: Dict) -> str:
+    """``2.3``: the third shot of the second scene, as the script reads now."""
+    return f"{scene['number']}.{shot['number']}"
+
+
+def excerpt(text: str, limit: int = 140) -> str:
+    text = " ".join(text.split())
+    return text if len(text) <= limit else text[:limit - 3].rstrip() + "..."
 
 
 @st.cache_data(show_spinner=False, max_entries=4)
@@ -40,19 +51,19 @@ def build_zip(files: Tuple[Tuple[str, str], ...]) -> bytes:
 
 def export_files(script: Dict, key: str) -> Tuple[Tuple[str, str], ...]:
     """Every shot's file under ``key`` (``final_path`` or ``video_path``), named in story order
-    (``01_scene1_01_shot1.png``) so the files sort as the episode runs."""
+    (``01_03_a3f9c2.png``: scene, shot, shot id) so the files sort as the episode runs."""
     files = []
-    for scene_number, scene in enumerate(script['scenes'], start=1):
-        for shot_number, shot in enumerate(scene['shots'], start=1):
+    for scene in script['scenes']:
+        for shot in scene['shots']:
             if shot.get(key):
                 suffix = Path(shot[key]).suffix
-                files.append((f"{scene_number:02}_{scene['id']}_{shot_number:02}_{shot['id']}{suffix}", shot[key]))
+                files.append((f"{scene['number']:02}_{shot['number']:02}_{shot['id']}{suffix}", shot[key]))
     return tuple(files)
 
 
 def generate_shots(world: str, episode: str, shots: List[Tuple[str, str]], what: str,
                    body: Optional[Dict] = None, action: str = "generate") -> None:
-    """Render each ``(scene, shot)`` with the shot's ``action`` endpoint (``generate`` for the
+    """Render each ``(label, shot id)`` with the shot's ``action`` endpoint (``generate`` for the
     frame, ``video`` for the clip), ``PARALLEL_RENDERS`` at a time, then leave a notice for the rerun.
 
     Only the requests run in worker threads: Streamlit calls must stay on the
@@ -62,9 +73,9 @@ def generate_shots(world: str, episode: str, shots: List[Tuple[str, str]], what:
     with st.status(f"Generating {len(shots)} {what}(s), {PARALLEL_RENDERS} at a time... each can take a few minutes.") as status:
         with ThreadPoolExecutor(max_workers=PARALLEL_RENDERS) as pool:
             futures = {
-                pool.submit(api.post, f"{episode_url(world, episode)}/scenes/{scene_id}/shots/{shot_id}/{action}", json=body):
-                    f"{scene_id}/{shot_id}"
-                for scene_id, shot_id in shots
+                pool.submit(api.post, f"{episode_url(world, episode)}/shots/{shot_id}/{action}", json=body):
+                    f"shot {label}"
+                for label, shot_id in shots
             }
             for done, future in enumerate(as_completed(futures), start=1):
                 try:
@@ -79,24 +90,13 @@ def generate_shots(world: str, episode: str, shots: List[Tuple[str, str]], what:
         notify('success', f"Generated {len(shots)} {what}(s).")
 
 
-def save_shot_setting(world: str, episode: str, scene_id: str, shot_id: str, field: str, key: str,
-                      reload_script: bool) -> None:
-    """Save one shot setting (``type`` on the Storyboard, ``camera`` or ``duration`` on the Video page)
-    as picked in widget ``key``, and nothing else. Runs as the widget's on_change.
-
-    With ``reload_script``, the Script page's fields reload from the saved script next time.
-    """
+def save_shot_setting(world: str, episode: str, shot_id: str, field: str, key: str) -> None:
+    """Save one shot setting (``duration``, ``end_on_next``, ``characters`` or ``objects``) as picked in widget
+    ``key``. Runs as the widget's on_change."""
     try:
-        script = api.get(episode_url(world, episode))
-        for scene in script['scenes']:
-            for shot in scene['shots']:
-                if scene['id'] == scene_id and shot['id'] == shot_id:
-                    shot[field] = st.session_state[key]
-        api.put(episode_url(world, episode), json=script)
-        if reload_script:
-            st.session_state.script_revision += 1
+        api.patch(f"{episode_url(world, episode)}/shots/{shot_id}", json={field: st.session_state[key]})
     except api.ApiError as exc:
-        st.session_state.notice = ('error', f"Could not save {scene_id}/{shot_id}: {exc}")
+        st.session_state.notice = ('error', f"Could not save the shot: {exc}")
 
 
 def pick_episode(world: str, container=st) -> Optional[str]:
@@ -117,13 +117,14 @@ def pick_episode(world: str, container=st) -> Optional[str]:
 
 
 def asset_names(world: str) -> Dict[str, List[str]]:
-    """Script field -> every reference of that type in the world (``name``, then each ``name:variation``), for the pickers."""
+    """Script field -> every reference of that type in the world (``name``, then each ``name:variation``), for the
+    tag pickers. An asset with no image yet is listed too: the text model can tag it, and its description is used."""
     names = {}
     for field, asset_type in REFERENCE_FIELDS.items():
         assets = api.get("/assets", world=world, asset_type=asset_type)['assets']
         names[field] = [
             ref
-            for asset in assets if asset['variations']
+            for asset in assets
             for ref in [asset['name'], *(variation['ref'] for variation in asset['variations'])]
         ]
     return names
@@ -132,23 +133,3 @@ def asset_names(world: str) -> Dict[str, List[str]]:
 def reference_label(reference: str) -> str:
     """``fox:older`` reads as ``fox · older``; a bare name is the asset's preferred image."""
     return reference.replace(":", " · ", 1) if ":" in reference else f"{reference} (preferred)"
-
-
-def scene_fields(scene: Dict, names: Dict[str, List[str]], prefix: str, on_change=None, args: tuple = ()) -> Dict:
-    """Edit a scene's heading, summary and references, each calling ``on_change(*args)`` when it changes.
-    Returns the scene with the edits applied."""
-    changed = {'on_change': on_change, 'args': args}
-    heading = st.text_input("Heading", value=scene['heading'], placeholder="INT. KITCHEN - DAY",
-                            key=f"{prefix}heading", **changed)
-    summary = st.text_area("What happens", value=scene['summary'], height=180, key=f"{prefix}summary", **changed)
-    picks = {}
-    # Characters, locations and objects side by side, on one line.
-    for column, field in zip(st.columns(len(REFERENCE_FIELDS)), REFERENCE_FIELDS):
-        # Keep names whose asset is gone, so saving never drops them.
-        options = names[field] + [name for name in scene[field] if name not in names[field]]
-        picks[field] = column.multiselect(
-            field.capitalize(), options, default=scene[field], format_func=reference_label, key=f"{prefix}{field}",
-            **changed,
-        )
-    return {**scene, 'heading': heading, 'summary': summary, **picks}
-

@@ -1,11 +1,12 @@
 """Video: each shot's final frame animated into a clip (Runware MiniMax H3 Fast at 768p), and a zip of them all.
 
 Each shot is a row: its frame on the left, its video on the right, so a
-video that is missing, or older than a regenerated frame (flagged), stands out.
-A clip starts from the shot's final frame and is prompted with the world's
-style, the shot's text (the scene's heading, summary and cast, and the shot's
-type and action) and its camera move, with no dialogue or voices. Each shot's
-camera move and clip length are set only here, and saved with the shot. A shot needs its final frame first (the Storyboard page). Every
+video that is missing, or out of date (made from another frame, or before the
+shot or its length changed: flagged), stands out. A clip starts from the
+shot's final frame and is prompted with the world's style and the shot's text
+(the scene's heading and summary, the shot's action and tagged cast), with no
+dialogue or voices. The camera moves only as the action says. Each shot's clip
+length is saved in the script (it is also on the Script page's Shots tab). A shot needs its final frame first (the Storyboard page). Every
 clip is a paid render, so its price is shown before each button; the billed
 figure lands in the world's cost log.
 """
@@ -19,7 +20,8 @@ import streamlit as st
 import api
 from shared.state import show_notice
 from shared.story import (
-    build_zip, episode_url, export_files, generate_shots, pick_episode, save_shot_setting, shots_in_order,
+    build_zip, episode_url, excerpt, export_files, generate_shots, pick_episode, save_shot_setting, shot_label,
+    shots_in_order,
 )
 from shared.ui import plural
 from shared.worlds import render_world_switcher
@@ -34,53 +36,41 @@ def money(usd: float) -> str:
     return f"\\${usd:.2f}"
 
 
-def render_controls(world: str, episode: str, scene: Dict, shot: Dict, video: Dict, has_next_frame: bool) -> bool:
-    """One line: the camera move, clip length and "end on the next shot" toggle (saved as soon as any changes)
-    and the priced Generate or Regenerate button. The toggle needs a next shot with a final frame.
-    Returns whether the button was clicked."""
-    camera_col, length_col, next_col, button_col = st.columns([3, 2, 2, 4], vertical_alignment='center')
-    prefix = f"video_{world}_{episode}_{scene['id']}_{shot['id']}_{st.session_state.script_revision}_"
-    camera_col.selectbox(
-        "Camera", video['camera_moves'], index=video['camera_moves'].index(shot['camera']),
-        label_visibility='collapsed', help="Camera move", key=f"{prefix}camera", on_change=save_shot_setting,
-        args=(world, episode, scene['id'], shot['id'], 'camera', f"{prefix}camera", True),
-    )
+def render_controls(world: str, episode: str, shot: Dict, video: Dict, has_next_frame: bool) -> bool:
+    """One line: the clip length and "end on the next shot" toggle (saved as soon as either changes) and the priced
+    Generate or Regenerate button. The toggle needs a next shot with a final frame. Returns whether it was clicked."""
+    length_col, next_col, button_col = st.columns([2, 2, 4], vertical_alignment='center')
+    prefix = f"video_{world}_{episode}_{shot['id']}_"
     length_col.selectbox(
         "Length", video['durations'], index=video['durations'].index(shot['duration']),
         format_func=lambda seconds: f"{seconds} s", label_visibility='collapsed', help="Clip length",
-        key=f"{prefix}duration", on_change=save_shot_setting,
-        args=(world, episode, scene['id'], shot['id'], 'duration', f"{prefix}duration", True),
+        key=f"{prefix}duration_{shot['duration']}", on_change=save_shot_setting,
+        args=(world, episode, shot['id'], 'duration', f"{prefix}duration_{shot['duration']}"),
     )
     next_col.toggle(
         "Next", value=shot['end_on_next'] and has_next_frame, disabled=not has_next_frame,
         help="End the clip on the next shot's final frame" if has_next_frame
         else "Needs a next shot with a final frame", key=f"{prefix}end_on_next", on_change=save_shot_setting,
-        args=(world, episode, scene['id'], shot['id'], 'end_on_next', f"{prefix}end_on_next", True),
+        args=(world, episode, shot['id'], 'end_on_next', f"{prefix}end_on_next"),
     )
     label = "Regenerate" if shot.get('video_path') else "Generate"
-    return button_col.button(f"{label} · {money(clip_price(video, shot))}", key=f"video_{scene['id']}_{shot['id']}",
-                             width='stretch')
+    return button_col.button(f"{label} · {money(clip_price(video, shot))}", key=f"video_{shot['id']}", width='stretch')
 
 
 def is_stale(shot: Dict) -> bool:
-    """True when the shot's frame was regenerated after its video was made, so the video no longer matches it."""
-    if not (shot.get('video_path') and shot.get('final_path')):
-        return False
-    return api.file_path(shot['final_path']).stat().st_mtime > api.file_path(shot['video_path']).stat().st_mtime
+    """True when the video was made from another frame, or before the shot or its length changed."""
+    return bool(shot.get('video_path')) and shot['video_stale']
 
 
-def shot_caption(shot: Dict) -> str:
-    action = shot['action'].strip()
-    action = action if len(action) <= 140 else action[:137].rstrip() + "..."
-    parts = [f"**{shot['id']}**", shot['type'] or "", action]
-    return " · ".join(part for part in parts if part)
+def shot_caption(scene: Dict, shot: Dict) -> str:
+    return f"**{shot_label(scene, shot)}** · {excerpt(shot['action'])}"
 
 
 def render_shot(world: str, episode: str, scene: Dict, shot: Dict, video: Dict, has_next_frame: bool) -> bool:
     """One shot as a row: its frame on the left, its video on the right, then one line beneath each,
-    side by side: under the frame, a warning when the video is older than it; under the video, the camera,
-    length and priced button. Returns whether the button was clicked."""
-    st.markdown(shot_caption(shot))
+    side by side: under the frame, a warning when the video is out of date; under the video, the clip length,
+    "end on the next frame" toggle and priced button. Returns whether the button was clicked."""
+    st.markdown(shot_caption(scene, shot))
     frame_col, video_col = st.columns(2)
     if not shot.get('final_path'):
         frame_col.info("No final frame yet. Generate it on the Storyboard first.", icon=":material/image:")
@@ -94,28 +84,31 @@ def render_shot(world: str, episode: str, scene: Dict, shot: Dict, video: Dict, 
 
     warning_col, controls_col = st.columns(2, vertical_alignment='center')
     if is_stale(shot):
-        warning_col.warning("Frame changed after this video. Regenerate to match.", icon=":material/sync_problem:")
+        warning_col.warning("The frame, the shot or its length changed after this video. Regenerate to match.",
+                            icon=":material/sync_problem:")
     with controls_col:
-        return render_controls(world, episode, scene, shot, video, has_next_frame)
+        return render_controls(world, episode, shot, video, has_next_frame)
 
 
 def render_grid(world: str, episode: str, script: Dict, video: Dict) -> List[Tuple[str, str]]:
     """Every shot, scene by scene, as a frame | video row. Returns the shots whose button was clicked."""
     clicked = []
     for scene in script['scenes']:
-        if not scene['shots']:
+        if not any(shot['id'] for shot in scene['shots']):
             continue
-        st.subheader(scene['heading'] or scene['id'])
+        st.subheader(f"{scene['number']}. {scene['heading']}")
         left, right = st.columns(2)
         left.caption("Frame")
         right.caption("Video")
         for number, shot in enumerate(scene['shots']):
+            if not shot['id']:
+                continue
             if number:
                 st.divider()
             following = scene['shots'][number + 1:number + 2]
             has_next_frame = bool(following and following[0].get('final_path'))
             if render_shot(world, episode, scene, shot, video, has_next_frame):
-                clicked.append((scene['id'], shot['id']))
+                clicked.append((shot_label(scene, shot), shot['id']))
     return clicked
 
 
@@ -133,8 +126,8 @@ def main() -> None:
         return
 
     video = api.options()['video']
-    framed = [(scene['id'], shot['id']) for scene, shot in shots if shot.get('final_path')]
-    prices = {(scene['id'], shot['id']): clip_price(video, shot) for scene, shot in shots}
+    framed = [(shot_label(scene, shot), shot['id']) for scene, shot in shots if shot.get('final_path')]
+    prices = {(shot_label(scene, shot), shot['id']): clip_price(video, shot) for scene, shot in shots}
     if not framed:
         st.info("No shot has a final frame yet. Generate them on the Storyboard, then animate them here.")
         if st.button("Go to the Storyboard"):
@@ -144,12 +137,12 @@ def main() -> None:
     info_col, action_col = st.columns([3, 2], vertical_alignment='bottom')
     info_col.caption(
         f"{video['model']} at {video['resolution']}, no voices · **{money(video['usd_per_second'])} per second** "
-        "of clip (list price; the billed figure is logged). Each shot's camera move and length are saved with it."
+        "of clip (list price; the billed figure is logged). The camera moves only as each shot's action says."
     )
 
-    with_video = {(scene['id'], shot['id']) for scene, shot in shots if shot.get('video_path')}
+    with_video = {(shot_label(scene, shot), shot['id']) for scene, shot in shots if shot.get('video_path')}
     missing = [key for key in framed if key not in with_video]
-    stale = [(scene['id'], shot['id']) for scene, shot in shots if is_stale(shot)]
+    stale = [(shot_label(scene, shot), shot['id']) for scene, shot in shots if is_stale(shot)]
     # Pending: no video yet, or one made from an older frame. Kept in story order.
     pending = [key for key in framed if key in set(missing) | set(stale)]
     generate_all = False
@@ -158,7 +151,7 @@ def main() -> None:
             generate_all = st.button(
                 f"Generate {plural(len(pending), 'pending video')} · {money(sum(prices[key] for key in pending))}",
                 type="primary", width='stretch',
-                help="Every shot with a frame but no video, plus every video older than its frame.",
+                help="Every shot with a frame but no video, plus every video that is out of date.",
             )
         elif len(framed) == len(shots):
             # Like the Storyboard: export only once every shot has a video that matches its frame.
@@ -172,7 +165,7 @@ def main() -> None:
     if missing:
         status.append(f"{len(missing)} not generated")
     if stale:
-        status.append(f"{len(stale)} older than their frame")
+        status.append(f"{len(stale)} out of date")
     if len(framed) < len(shots):
         status.append(f"{plural(len(shots) - len(framed), 'shot')} without a frame yet")
     st.caption(" · ".join(status))

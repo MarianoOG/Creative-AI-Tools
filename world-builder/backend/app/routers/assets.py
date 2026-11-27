@@ -24,6 +24,7 @@ from app.assets.generation import (
 from app.assets.prompt_manager import (
     ASSET_DIRS, ESTABLISHING_VIEW, LEGACY_VIEW_CHANGES, STYLES, build_prompt, variation_description,
 )
+from app.assets.tagging import CHECKLIST, TEXT_MODEL
 from app.assets.worlds import DEFAULT_WORLD, read_style, slugify, world_dir
 from app.routers.common import call, check_world, provider_errors
 
@@ -188,7 +189,8 @@ def options() -> Dict:
         "default_final_provider": DEFAULT_FINAL_PROVIDER,
         "price_estimates": PRICE_ESTIMATES,
         "aspect_ratios": list(ASPECT_RATIOS),
-        "shot_types": story.SHOT_TYPES,
+        "checklist": CHECKLIST,
+        "text_model": TEXT_MODEL,
         "establishing_view": ESTABLISHING_VIEW,
         "default_world": DEFAULT_WORLD,
         "video": {
@@ -197,8 +199,6 @@ def options() -> Dict:
             "usd_per_second": video.USD_PER_SECOND,
             "durations": list(video.DURATIONS),
             "default_duration": video.DEFAULT_DURATION,
-            "camera_moves": list(video.CAMERA_MOVES),
-            "default_camera": video.DEFAULT_CAMERA,
         },
     }
 

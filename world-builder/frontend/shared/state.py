@@ -13,8 +13,12 @@ def init_session_state() -> None:
         'current_episode': None,
         # The (asset_type, name) the Asset page opens on.
         'current_asset': None,
-        # Bumped on every Script page save, so its fields reload from the saved script.
+        # Bumped on every Script page save, restore or discard, so the editor reloads from the saved script.
         'script_revision': 0,
+        # (world, episode) -> the Script editor's unsaved text, kept while you visit other pages.
+        'drafts': {},
+        # The Script page's preview, as the editor last parsed it.
+        'script_elements': [],
         # One-shot (kind, text) message shown after the rerun that caused it.
         'notice': None,
     }
