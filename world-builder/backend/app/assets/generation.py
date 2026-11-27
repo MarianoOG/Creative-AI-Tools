@@ -73,30 +73,29 @@ def model_key(provider: Optional[str]) -> Optional[str]:
     return LEGACY_PROVIDERS.get(provider or "", provider)
 
 
-#: Friendly name -> ratio. ``panorama`` is for locations only; episodes pick one of the other three.
-ASPECT_RATIOS = {"landscape": "16:9", "square": "1:1", "portrait": "9:16"}
-PANORAMA = "panorama"
+#: Friendly name -> ratio. Locations always render as ``panorama``.
+ASPECT_RATIOS = {"landscape": "16:9", "square": "1:1", "portrait": "9:16", "panorama": "3:1"}
 
 #: Model family -> resolution -> ratio -> (width, height). The GPT models take any size (sides
 #: divisible by 16, 1:3 to 3:1); Nano Banana only the sizes its table lists, and no 3:1 (its
-#: panorama is 21:9); FLUX 3 Image likewise (its presets, 21:9 panorama); FLUX 3 Klein takes
+#: "3:1" is 21:9); FLUX 3 Image likewise (its presets, 21:9 again); FLUX 3 Klein takes
 #: any size up to 4096 a side (multiples of 16). 1K matches the 768p video.
 SIZES: Dict[str, Dict[str, Dict[str, tuple[int, int]]]] = {
     "gpt": {
         "2K": {"16:9": (2048, 1152), "1:1": (2048, 2048), "9:16": (1152, 2048), "3:1": (3072, 1024)},
-        "1K": {"16:9": (1360, 768), "1:1": (1024, 1024), "9:16": (768, 1360)},
+        "1K": {"16:9": (1360, 768), "1:1": (1024, 1024), "9:16": (768, 1360), "3:1": (1776, 592)},
     },
     "nano-banana": {
         "2K": {"16:9": (2752, 1536), "1:1": (2048, 2048), "9:16": (1536, 2752), "3:1": (3168, 1344)},
-        "1K": {"16:9": (1376, 768), "1:1": (1024, 1024), "9:16": (768, 1376)},
+        "1K": {"16:9": (1376, 768), "1:1": (1024, 1024), "9:16": (768, 1376), "3:1": (1584, 672)},
     },
     "flux-3": {
         "2K": {"16:9": (2736, 1536), "1:1": (2048, 2048), "9:16": (1536, 2736), "3:1": (3136, 1344)},
-        "1K": {"16:9": (1360, 768), "1:1": (1024, 1024), "9:16": (768, 1360)},
+        "1K": {"16:9": (1360, 768), "1:1": (1024, 1024), "9:16": (768, 1360), "3:1": (1568, 672)},
     },
     "flux-3-klein": {
         "2K": {"16:9": (2048, 1152), "1:1": (2048, 2048), "9:16": (1152, 2048), "3:1": (3072, 1024)},
-        "1K": {"16:9": (1360, 768), "1:1": (1024, 1024), "9:16": (768, 1360)},
+        "1K": {"16:9": (1360, 768), "1:1": (1024, 1024), "9:16": (768, 1360), "3:1": (1776, 592)},
     },
 }
 
@@ -109,10 +108,9 @@ QUALITY: dict[str, tuple[str, Optional[str]]] = {
     "frame": ("medium", "high"),
 }
 
-#: Characters and objects are always rendered like this; locations as a panorama;
+#: Characters and objects are always rendered like this; locations as a ``panorama``;
 #: final frames take their ratio from the episode.
 ASSET_ASPECT_RATIO = "landscape"
-LOCATION_ASPECT_RATIO = PANORAMA
 ASSET_QUALITY = "high"
 ASSET_RESOLUTION = "2K"
 #: Final frames only feed the video, so they render at its size.
@@ -139,8 +137,7 @@ def _base64(path: Path) -> str:
 
 def image_size(provider: str, aspect_ratio: str, resolution: str) -> tuple[int, int]:
     """The (width, height) ``provider`` renders for an aspect ratio name and a resolution."""
-    ratio = "3:1" if aspect_ratio == PANORAMA else ASPECT_RATIOS[aspect_ratio]
-    return SIZES[MODELS[provider]["family"]][resolution][ratio]
+    return SIZES[MODELS[provider]["family"]][resolution][ASPECT_RATIOS[aspect_ratio]]
 
 
 def runware_task(provider: str, prompt: str, size: tuple[int, int], quality: str,

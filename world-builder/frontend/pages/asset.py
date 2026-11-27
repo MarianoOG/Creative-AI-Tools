@@ -129,7 +129,7 @@ def render_new_variation(asset: Dict, options: Dict, provider: str) -> None:
     if panorama:
         st.caption("One wide 3:1 panorama of the whole place, drawn from the description. It becomes the preferred "
                    "image, every other variation is drawn from it, and final frames crop whatever angle a shot needs.")
-        name, change = options['panorama_view'], ""
+        name, change = "panorama", ""
     else:
         if asset['variations']:
             source = asset['variations'][0]['name'] if location else asset['preferred']

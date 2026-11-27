@@ -23,11 +23,11 @@ from pydantic import BaseModel
 
 from app.assets import library, story, video
 from app.assets.generation import (
-    ASPECT_RATIOS, DEFAULT_FINAL_PROVIDER, DEFAULT_PROVIDER, FINAL_PROVIDERS, LOCATION_ASPECT_RATIO, PRICE_ESTIMATES,
+    ASPECT_RATIOS, DEFAULT_FINAL_PROVIDER, DEFAULT_PROVIDER, FINAL_PROVIDERS, PRICE_ESTIMATES,
     PROVIDERS, generate_image, model_key,
 )
 from app.assets.prompt_manager import (
-    ASSET_DIRS, LEGACY_VIEW_CHANGES, PANORAMA_VIEW, STYLES, build_prompt, variation_description,
+    ASSET_DIRS, LEGACY_VIEW_CHANGES, STYLES, build_prompt, variation_description,
 )
 from app.assets.tagging import CHECKLIST, TEXT_MODEL
 from app.assets.worlds import DEFAULT_WORLD, read_style, slugify, world_dir
@@ -127,7 +127,7 @@ def _render(world: str, asset_type: str, asset: Dict, variation: str, change: st
     style = read_style(world)
     subject = asset["description"] or asset["name"].replace("_", " ")
     anchor = _anchor(world, asset_type, asset, variation)
-    options: Dict = {"aspect_ratio": LOCATION_ASPECT_RATIO} if asset_type == "location" else {}
+    options: Dict = {"aspect_ratio": "panorama"} if asset_type == "location" else {}
     if asset_type == "location" and not anchor:
         # The base panorama (or a variation whose base image is gone): drawn from the description.
         description = f"{subject}\n\n{change}".strip()
@@ -205,7 +205,6 @@ def options() -> Dict:
         "aspect_ratios": list(ASPECT_RATIOS),
         "checklist": CHECKLIST,
         "text_model": TEXT_MODEL,
-        "panorama_view": PANORAMA_VIEW,
         "default_world": DEFAULT_WORLD,
         "video": {
             "model": video.VIDEO_MODEL_NAME,
@@ -286,7 +285,7 @@ def add_variation(
     provider = check_provider(provider)
     asset = _asset(world, asset_type, name)
     if asset_type == "location" and not asset["variations"]:
-        slug = PANORAMA_VIEW
+        slug = "panorama"
     else:
         slug = slugify(variation)
     if not slug:

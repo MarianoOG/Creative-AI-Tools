@@ -32,6 +32,7 @@ def test_tasks_per_model():
     assert frame["model"] == "openai:gpt-image@2.6-flare" and frame["settings"] == {"quality": "medium"}
     assert frame["inputs"] == {"referenceImages": ["data:image/jpeg;base64,AAAA"]}
 
+    assert image_size("nano-banana", "panorama", "1K") == (1584, 672)  # no 3:1 preset: 21:9
     nano = runware_task("nano-banana", "a forest", image_size("nano-banana", "landscape", "1K"), "frame")
     assert nano["model"] == "google:nano-banana@2.1" and (nano["width"], nano["height"]) == (1376, 768)
     assert nano["settings"] == {"thinkingLevel": "high"}

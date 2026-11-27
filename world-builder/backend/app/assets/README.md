@@ -202,7 +202,8 @@ wait for the render and return the result. Each image is rendered by one
 - **final frames**: the shot endpoint, with `{"provider": "nano-banana"}` (any of the models)
   (the episode's last one when left out), renders the shot's finished, fully
   detailed frame at 1K (1360×768 landscape, the size of the 768p video it becomes) in the episode's
-  aspect ratio, with the GPT models at medium quality. It is sent the image of every character
+  aspect ratio (landscape, square, portrait or panorama: the same `ASPECT_RATIOS` locations use),
+  with the GPT models at medium quality. It is sent the image of every character
   and object tagged on the shot and every location tagged on its scene (as designs to reproduce,
   which with the world's style decide the look), plus their descriptions and the shot's text
   (the scene's heading and summary, and the shot's action; not its dialogue).

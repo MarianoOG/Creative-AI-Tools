@@ -160,8 +160,7 @@ LOCATION_VIEWS: dict[str, str] = {
         "reference image, across its full width. "
     ),
 }
-#: The view a location's first image is rendered in, and the one its variations are drawn from.
-PANORAMA_VIEW = next(iter(LOCATION_VIEWS))
+
 #: What the fixed views of earlier versions showed, used when one of them is regenerated without a description.
 LEGACY_VIEW_CHANGES: dict[str, str] = {
     "reverse": (
@@ -307,7 +306,7 @@ def build_prompt(
     description: str,
     style: str,
     clause: str | None = None,
-    view: str = PANORAMA_VIEW,
+    view: str = "panorama",
 ) -> str:
     """Compose the full prompt for one image. For a final frame, ``description`` is the situation to depict.
 
