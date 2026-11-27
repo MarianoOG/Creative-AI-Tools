@@ -1,6 +1,8 @@
 # Formats
 
-One long-form and one short-form video per project. Each is its own Shotcut project.
+A project is one video, and it first says whether it is **landscape (long-form)** or **vertical (short-form)**. Each has its own rules below. A source gives one long-form video and as many short-form videos as needed, each its own Shotcut project.
+
+Assume YouTube is the target: long-form on YouTube, short-form on YouTube Shorts. If the user directs another platform or another way of editing, follow that.
 
 | | Long-form | Short-form |
 |---|---|---|
@@ -16,10 +18,9 @@ One long-form and one short-form video per project. Each is its own Shotcut proj
 
 ## Long-form notes
 
-- **Chapters:** keep a list of chapter start times (`00:00 Title`) in `notes.md`. They go in the YouTube description. The first chapter starts at `00:00`.
-- **LinkedIn** gets the same file. If it's too long to work there, ask whether the user wants a shorter LinkedIn cut or a link to YouTube. Don't decide alone.
-- **Website articles** embed the YouTube upload, so nothing changes in the edit.
-- **Thumbnail:** export 2–3 candidate frames (1280×720 PNG) into `02 Edit/Thumbnails/` if the user asks for a thumbnail.
+- **Chapters:** a long-form video has chapters. Mark them in the project with Shotcut markers (one colour, the chapter title as the marker text) and in the output with a chapter title card on `V3`.
+- **Thumbnail:** keep the candidates inside the project: a marker named "Thumbnail", in its own colour, on each candidate frame (2–3). Export a 1280×720 PNG of one only if the user asks.
+- **Other platforms:** LinkedIn and website embeds use the same file. Edit differently only when the user directs it.
 
 ## Short-form notes
 

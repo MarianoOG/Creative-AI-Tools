@@ -5,13 +5,11 @@ For raw talking-head or course footage. Goal: a first-draft Shotcut project the 
 ## 0. Before touching anything (ask in one message)
 
 - **Who is the video for, and what should they be able to do afterwards?** The audience decides the story order. Don't build in recording order first.
-- Which files are the originals (base quality) and which are old exports or someone else's cuts.
-- Shotcut version (Help > About). RNNoise needs 26.06 or newer.
 - If a tool or model can't be downloaded (for example, the network allowlist blocks Hugging Face), **ask** before using any unofficial mirror. The user can put the model file in the folder, run the step locally or allow the domain.
 
 ## 1. Organise the folder
 
-Use the layout in `SKILL.md`. Originals go to `01 Source/`, moved and unchanged, and old cuts go to `01 Source/Old cuts/`. Transcripts go to `02 Edit/Transcripts/`, scratch to `_claude_scratch/`.
+Use the layout in `SKILL.md`. Originals go to `01 Source/`, moved and unchanged. Transcripts go to `02 Edit/Transcripts/`, scratch to `_claude_scratch/`.
 
 ## 2. Analyse (cheap first)
 

@@ -1,14 +1,16 @@
 # Video Production
 
 A Claude plugin with one skill, `edit-video`. It turns footage, clips, an HTML
-animation or an existing video into two finished videos from the same material,
-each with a [Shotcut](https://shotcut.org) project behind it so you can open it
-and keep adjusting it:
+animation or an existing video into finished videos: one long-form (landscape)
+and as many short-form (vertical) as you need. Each video is its own
+[Shotcut](https://shotcut.org) project, which first says whether it is landscape
+or vertical, so you can open it and keep adjusting it. A request produces one
+video unless you ask for more:
 
 | | Long-form | Short-form |
 | --- | --- | --- |
 | Frame | 1920×1080, 16:9 | 1080×1920, 9:16 |
-| Made for | YouTube, LinkedIn, website embeds | YouTube Shorts, Instagram Reels, TikTok |
+| Made for | YouTube (the default target) | YouTube Shorts |
 | Subtitles | Sidecar `.srt` | Burned in |
 
 It renders with `melt` (Shotcut's renderer), checks the result (duration, sound,
