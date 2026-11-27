@@ -33,6 +33,7 @@ class ScriptText(BaseModel):
 class Settings(BaseModel):
     aspect_ratio: Optional[str] = None
     final_provider: Optional[str] = None
+    video_model: Optional[str] = None
 
 
 class ShotEdit(BaseModel):
@@ -53,6 +54,11 @@ class Version(BaseModel):
 class FinalFrame(BaseModel):
     #: The final frame's model (a key of ``generation.MODELS``); the episode's last one when left out.
     provider: Optional[str] = None
+
+
+class ShotVideo(BaseModel):
+    #: The video's model (a key of ``video.VIDEO_MODELS``); the episode's last one when left out.
+    model: Optional[str] = None
 
 
 @router.get("")
@@ -119,7 +125,7 @@ def reprocess(world: str, episode: str) -> Dict:
 @router.patch("/{episode}")
 def patch_settings(world: str, episode: str, body: Settings) -> Dict:
     check_world(world)
-    return call(story.set_settings, world, episode, body.aspect_ratio, body.final_provider)
+    return call(story.set_settings, world, episode, body.aspect_ratio, body.final_provider, body.video_model)
 
 
 @router.patch("/{episode}/shots/{shot}")
@@ -260,15 +266,21 @@ def generate_shot(world: str, episode: str, shot: str, body: Optional[FinalFrame
 
 
 @router.post("/{episode}/shots/{shot}/video")
-def generate_shot_video(world: str, episode: str, shot: str) -> Dict:
+def generate_shot_video(world: str, episode: str, shot: str, body: Optional[ShotVideo] = None) -> Dict:
     """Render a shot's video from its final frame, replacing the one it had (whose file stays on disk).
 
-    It uses Runware's MiniMax H3 Fast at 768p for the shot's clip length, starting from the shot's final frame and
+    It uses one of Runware's video models (MiniMax H3 Fast at 768p or Gemini Omni Flash 1.2 at 720p) for the shot's clip length, starting from the shot's final frame and
     prompted with the shot's text (the scene's heading and summary, the shot's action and its tagged cast) and the
     world's style. The camera moves only as the action says. No dialogue or voices.
     """
     check_world(world)
-    _, scene_data, shot_data, following = _shot(world, episode, shot)
+    view, scene_data, shot_data, following = _shot(world, episode, shot)
+    model = (body.model if body else None) or view["video_model"]
+    if model not in video.VIDEO_MODELS:
+        raise HTTPException(422, f"the video model must be one of {list(video.VIDEO_MODELS)}")
+    if shot_data["duration"] not in video.VIDEO_MODELS[model]["durations"]:
+        raise HTTPException(422, f"{video.VIDEO_MODELS[model]['name']} renders clips of at most "
+                            f"{max(video.VIDEO_MODELS[model]['durations'])} seconds - shorten the shot or pick another model.")
     if not shot_data["final_path"]:
         raise HTTPException(422, "This shot has no final frame yet - generate it on the Storyboard first.")
     description = story.shot_description(scene_data, shot_data, _cast(world, scene_data, shot_data))
@@ -282,6 +294,6 @@ def generate_shot_video(world: str, episode: str, shot: str) -> Dict:
     with provider_errors("runware"):
         path = video.generate_video(
             world, f"{shot}-video", description, style, directory / shot_data["final"], story.shots_dir(world, episode),
-            duration=shot_data["duration"], end_frame=end_frame,
+            duration=shot_data["duration"], end_frame=end_frame, model=model,
         )
-    return story.set_shot_file(world, episode, shot, "video", path)
+    return story.set_shot_file(world, episode, shot, "video", path, video_model=model)

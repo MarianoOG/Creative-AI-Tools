@@ -43,7 +43,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from app.assets import fountain, sync, tagging
 from app.assets.generation import ASPECT_RATIOS, DEFAULT_FINAL_PROVIDER, FINAL_PROVIDERS
-from app.assets.video import DEFAULT_DURATION, DURATIONS
+from app.assets.video import DEFAULT_DURATION, DEFAULT_VIDEO_MODEL, DURATIONS, VIDEO_MODELS
 from app.assets.worlds import (
     child_dir, existing_dir, move_to_deleted, new_child_dir, read_world, subfolders, world_dir, write_json,
 )
@@ -91,7 +91,23 @@ def shots_dir(world: str, episode: str) -> Path:
 
 
 def list_episodes(world: str) -> List[str]:
-    return sorted(subfolders(episodes_dir(world)), key=_natural)
+    """Every episode, newest first (by when it was created; ties, and equal times, by name, last first)."""
+    names = sorted(subfolders(episodes_dir(world)), key=_natural, reverse=True)
+    return sorted(names, key=lambda name: _created(world, name), reverse=True)
+
+
+def _created(world: str, episode: str) -> str:
+    """When the episode was created (UTC, ISO 8601): from ``episode.json``, or, for an episode made before
+    that was kept, the oldest file in its folder (scripts are rewritten on save, but older files stay)."""
+    directory = episode_dir(world, episode)
+    try:
+        created = json.loads((directory / EPISODE_FILE).read_text()).get("created")
+    except (OSError, ValueError, AttributeError):
+        created = None
+    if isinstance(created, str):
+        return created
+    times = [path.stat().st_mtime for path in directory.rglob("*") if path.is_file()]
+    return datetime.fromtimestamp(min(times), timezone.utc).isoformat() if times else ""
 
 
 def _natural(name: str) -> list:
@@ -109,9 +125,12 @@ def _new_id(taken: set) -> str:
 
 def _clean_meta(raw: Dict) -> Dict:
     final_provider = raw.get("final_provider")
+    meta = {"created": raw["created"]} if isinstance(raw.get("created"), str) else {}
     return {
+        **meta,
         "aspect_ratio": raw.get("aspect_ratio") if raw.get("aspect_ratio") in ASPECT_RATIOS else "landscape",
         "final_provider": final_provider if final_provider in FINAL_PROVIDERS else DEFAULT_FINAL_PROVIDER,
+        "video_model": raw.get("video_model") if raw.get("video_model") in VIDEO_MODELS else DEFAULT_VIDEO_MODEL,
         "shots": {str(key): value for key, value in (raw.get("shots") or {}).items() if isinstance(value, dict)},
         "scenes": {str(key): value for key, value in (raw.get("scenes") or {}).items() if isinstance(value, dict)},
     }
@@ -262,6 +281,7 @@ def _view(world: str, episode: str, text: str, meta: Dict) -> Dict:
         "synopsis": parsed["synopsis"],
         "aspect_ratio": meta["aspect_ratio"],
         "final_provider": meta["final_provider"],
+        "video_model": meta["video_model"],
         "text": fountain.strip_notes(text),
         "scenes": scenes,
         "lint": parsed["lint"],
@@ -529,7 +549,7 @@ def set_scene(world: str, episode: str, scene_id: str, locations: List[str]) -> 
 
 
 def set_settings(world: str, episode: str, aspect_ratio: Optional[str] = None,
-                 final_provider: Optional[str] = None) -> Dict:
+                 final_provider: Optional[str] = None, video_model: Optional[str] = None) -> Dict:
     with _lock:
         _, meta = _read(world, episode)
         if aspect_ratio is not None:
@@ -540,12 +560,16 @@ def set_settings(world: str, episode: str, aspect_ratio: Optional[str] = None,
             if final_provider not in FINAL_PROVIDERS:
                 raise ValueError(f"final_provider must be one of {list(FINAL_PROVIDERS)}")
             meta["final_provider"] = final_provider
+        if video_model is not None:
+            if video_model not in VIDEO_MODELS:
+                raise ValueError(f"video_model must be one of {list(VIDEO_MODELS)}")
+            meta["video_model"] = video_model
         _write_meta(world, episode, meta)
         return read_episode(world, episode)
 
 
 def set_shot_file(world: str, episode: str, shot_id: str, field: str, path: Path,
-                  final_provider: Optional[str] = None) -> Dict:
+                  final_provider: Optional[str] = None, video_model: Optional[str] = None) -> Dict:
     """Point a shot's ``final`` or ``video`` at a new file in its episode, with the fingerprint it was made from.
     The previous file stays on disk."""
     with _lock:
@@ -560,6 +584,8 @@ def set_shot_file(world: str, episode: str, shot_id: str, field: str, path: Path
             entry["video_final"] = entry.get("final")
         if final_provider:
             meta["final_provider"] = final_provider
+        if video_model:
+            meta["video_model"] = video_model
         _write_meta(world, episode, meta)
         return read_episode(world, episode)
 
@@ -610,7 +636,8 @@ def create_episode(world: str, title: str, synopsis: str = "", aspect_ratio: str
     directory = new_child_dir(episodes_dir(world), title, "episode")
     directory.mkdir(parents=True)
     (directory / SCRIPT_FILE).write_text(_title_page(title, synopsis) + TEMPLATE_BODY)
-    _write_meta(world, directory.name, {"aspect_ratio": aspect_ratio})
+    _write_meta(world, directory.name, {"aspect_ratio": aspect_ratio,
+                                        "created": datetime.now(timezone.utc).isoformat()})
     return directory.name
 
 

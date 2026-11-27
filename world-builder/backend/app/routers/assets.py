@@ -206,9 +206,12 @@ def options() -> Dict:
         "text_model": TEXT_MODEL,
         "default_world": DEFAULT_WORLD,
         "video": {
-            "model": video.VIDEO_MODEL_NAME,
-            "resolution": video.VIDEO_RESOLUTION,
-            "usd_per_second": video.USD_PER_SECOND,
+            "models": {
+                key: {"name": model["name"], "resolution": model["resolution"],
+                      "usd_per_second": model["usd_per_second"], "durations": list(model["durations"])}
+                for key, model in video.VIDEO_MODELS.items()
+            },
+            "default_model": video.DEFAULT_VIDEO_MODEL,
             "durations": list(video.DURATIONS),
             "default_duration": video.DEFAULT_DURATION,
         },

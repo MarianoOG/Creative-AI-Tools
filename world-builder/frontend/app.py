@@ -46,6 +46,39 @@ st.html(
     [data-baseweb="tab-highlight"] {
         background-color: #ededee;
     }
+    /* The picked option of a view picker reads brightest, like the selected tab */
+    [data-testid="stBaseButton-segmented_controlActive"],
+    [data-testid="stBaseButton-segmented_controlActive"] p {
+        background-color: #ededee;
+        border-color: #ededee;
+        color: #0e0e10;
+    }
+    /* Pages start with their top bar instead of a title, so less space above it */
+    .stMainBlockContainer {
+        padding-top: 3.5rem;
+    }
+    /* A page's top bar (shared.ui.top_bar) stays on screen, under Streamlit's header, as the page
+       scrolls. Its wrapper is what sticks: the bar alone is exactly as tall as the wrapper and
+       would have no room to move. A band above it hides what scrolls between it and the window's top. */
+    [data-testid="stLayoutWrapper"]:has(> .st-key-top_bar) {
+        position: sticky;
+        top: 3.75rem;
+        z-index: 99;
+    }
+    [data-testid="stLayoutWrapper"]:has(> .st-key-top_bar)::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 100%;
+        height: 4rem;
+        background-color: #0e0e10;  /* background (grey-950) */
+    }
+    .st-key-top_bar {
+        background-color: #0e0e10;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #2c2c30;  /* border (grey-700) */
+    }
     </style>
     """
 )

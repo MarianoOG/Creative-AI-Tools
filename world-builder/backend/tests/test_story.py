@@ -175,3 +175,20 @@ def test_converts_an_episode_from_before_fountain(world):
     assert first["final_path"] and first["video_path"] and not first["final_stale"] and not first["video_stale"]
     assert second["action"] == "(No action yet.)"
     assert (directory / "script.json").is_file()
+
+
+def test_episodes_are_listed_newest_first(world):
+    names = [story.create_episode(world, title) for title in ("First", "Second", "Third")]
+    assert story.list_episodes(world) == names[::-1]
+    # Saving an older episode does not move it up: the order is by when each was created.
+    story.set_settings(world, names[0], aspect_ratio="portrait")
+    assert story.list_episodes(world)[-1] == names[0]
+
+
+def test_the_video_model_is_kept_per_episode(world):
+    episode = story.create_episode(world, "Pilot")
+    assert story.read_episode(world, episode)["video_model"] == "minimax-h3-fast"
+    story.set_settings(world, episode, video_model="gemini-omni-flash-1.2")
+    assert story.read_episode(world, episode)["video_model"] == "gemini-omni-flash-1.2"
+    with pytest.raises(ValueError):
+        story.set_settings(world, episode, video_model="no-such-model")

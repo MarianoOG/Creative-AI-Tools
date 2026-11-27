@@ -17,8 +17,6 @@ def init_session_state() -> None:
         'script_revision': 0,
         # (world, episode) -> the Script editor's unsaved text, kept while you visit other pages.
         'drafts': {},
-        # The Script page's preview, as the editor last parsed it.
-        'script_elements': [],
         # One-shot (kind, text) message shown after the rerun that caused it.
         'notice': None,
     }
