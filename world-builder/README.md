@@ -2,8 +2,8 @@
 
 Build **worlds** with OpenAI, Gemini or Runware (Flux 2 Klein 4B, cheap and fast). Each world has a `world.json` holding
 its visual style, its **context** (free notes on the premise, cast and tone, never sent to a render) and its **characters**, **locations** and **objects** (with
-their variations), and its **episodes**: scenes made of storyboard shots,
-written in a `script.json`.
+their variations), and its **episodes**: screenplays written in
+[Fountain](https://fountain.io), plain text where each action paragraph is a storyboard shot.
 
 | Service | What it does | `data/` access |
 | --- | --- | --- |
@@ -21,15 +21,19 @@ works is in `backend/app/assets/README.md`.
 | --- | --- |
 | World | The world's characters, locations and objects (three columns, each shown by its preferred image) and episodes, one tab each. Create assets (a name and a description) and episodes (a title, a synopsis and an aspect ratio) the same way, from a New button that opens a small form; a new one opens on its own page. Click an image or Edit to open the asset. |
 | Asset | One asset, picked in the sidebar: edit its name and description, and generate, prefer, regenerate (one or all) and delete its variations (a location starts with its establishing shot). |
-| Script | The whole episode, scene by scene and shot by shot, editable in place: each scene's heading, summary and references, and each shot's action (its type is set on the Storyboard, its camera move and clip length on the Video page), as text only (nothing is generated here). Add and delete scenes and shots (shots are numbered `shot1`, `shot2`... by their place in the scene, never named), and set the episode's aspect ratio. The episode picker is in the sidebar. Every field saves as soon as it changes (a text field when you leave it), so there is no Save button. |
-| Storyboard | An episode's final frames, two per row, each with one line under it: the shot's type (wide, medium, close-up, panorama, ...; saved as soon as it changes) and a Generate or Regenerate button with its price (this world's average logged cost for the chosen model, else a rough list price; OpenAI's varies). Generate the missing ones in one click (OpenAI, Gemini or Runware Flux 2 Klein, your pick, drawn from the shot's text and the scene's designs in the world's style), then download them all as a zip. Regenerating is one frame at a time: there is no "regenerate all", as it costs too much to be one click away. |
-| Video | One row per shot: its final frame on the left and its video on the right, so a missing video, or one older than a regenerated frame (flagged), stands out. Each shot's final frame is animated into a clip with Runware's MiniMax H3 Fast at 768p (no dialogue or voices), prompted with the world's style, the frame, the shot's text (scene heading, summary and cast, and the shot's type and action) and its camera move. Each shot has its own camera move (Static by default) and clip length (5 to 15 s, 5 by default), set on one line beside its button and saved with the shot. The price of each clip ($0.08/s list price) shows on every button; generate or regenerate one, or all the pending ones (missing or older than their frame). Once every shot has an up-to-date video, Export downloads them all as a zip (as on the Storyboard, which exports once every frame exists). There is no "regenerate all". A shot needs its final frame first. |
+| Script | The episode as a Fountain screenplay: a plain-text editor on the left, and on the right a live screenplay **Preview**, the **Shots** (each scene's locations and each shot's characters, objects, clip length and checklist) and a **Cheat sheet** of Fountain to copy and paste. Each action paragraph is a shot; the dialogue under it belongs to it. New episodes start from a sample scene of placeholders. Under the editor, a line says what saving would change (+1 scene · −2 shots · 1 shot modified) and syntax problems are listed by line (a heading without INT./EXT., a name with no dialogue under it, an unclosed note...). **Save** asks first, listing the changes (removals, and the frames they unlink, first). Saving keeps each shot's frames through edits (an edited shot's frame is flagged as out of date), and the text model (Claude Haiku on Runware) tags new and changed shots with the world's characters, objects and locations and lists which checklist items each shot does not mention (framing, camera angle, camera movement, who or what is in frame, what happens), without suggesting any. Fix a tag in the Shots tab and it stays as you set it. The ids and tags live in hidden notes in `script.fountain`, so they cannot be deleted from the editor. Every save keeps the previous script: **Versions** in the sidebar shows and restores them. **Reprocess file** fills in ids, tags and checklists after editing the file in another app. The sidebar also has the episode and its aspect ratio. Nothing is generated here. |
+| Storyboard | An episode's final frames, two per row, each with its number and words under it, a warning when the shot changed after its frame, and a Generate or Regenerate button with its price (this world's average logged cost for the chosen model, else a rough list price; OpenAI's varies). Generate the missing ones in one click (OpenAI, Gemini or Runware Flux 2 Klein, your pick, drawn from the shot's text and the designs of what is tagged on it, in the world's style), then download them all as a zip. Regenerating is one frame at a time: there is no "regenerate all", as it costs too much to be one click away. |
+| Video | One row per shot: its final frame on the left and its video on the right, so a missing or out-of-date video (made from another frame, or before the shot or its length changed: flagged) stands out. Each shot's final frame is animated into a clip with Runware's MiniMax H3 Fast at 768p (no dialogue or voices), prompted with the world's style, the frame and the shot's text (scene heading and summary, the shot's action and tagged cast). The camera moves only as the action says. Each shot's clip length (5 to 15 s, 5 by default; saved in the script) and "end on the next shot's frame" toggle sit on one line beside its button. The price of each clip ($0.08/s list price) shows on every button; generate or regenerate one, or all the pending ones (missing or out of date). Once every shot has an up-to-date video, Export downloads them all as a zip (as on the Storyboard, which exports once every frame exists). There is no "regenerate all". A shot needs its final frame first. |
 | Manage worlds | Create (from a style preset) and delete worlds, and edit each one's name, style and context behind one Save world button. |
 
 The sidebar holds the world picker.
 Nothing in the app removes a file. Deleting an asset or a variation only drops
-it from `world.json`; deleting a world, an episode or a scene moves its folder
-into a hidden `.deleted/` folder next to it. Each asks first.
+it from `world.json`; removing a shot from the script leaves its frame and video
+on disk (restore an older version to link them again); deleting a world or an
+episode moves its folder into a hidden `.deleted/` folder next to it. Each asks first.
+
+Episodes made before the Fountain script (a `script.json`) are converted on
+first open, keeping every frame and video.
 
 ## Setup
 
@@ -46,6 +50,12 @@ cp backend/.env.example backend/.env   # then fill in the keys you need
 ```bash
 cd backend && uvicorn app.main:app --reload   # terminal 1
 cd frontend && streamlit run app.py           # terminal 2
+```
+
+## Tests
+
+```bash
+cd backend && pip install pytest && python -m pytest tests
 ```
 
 ## Run with Docker

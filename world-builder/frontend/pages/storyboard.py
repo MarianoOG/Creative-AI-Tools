@@ -1,12 +1,13 @@
 """Storyboard: an episode's final frames in a grid, their generation, and a zip of them all.
 
-Two frames per row, each with one line under it: the shot's type (saved as soon
-as it changes) and a Generate or Regenerate button with its price (this
-world's average logged cost for the model, else a rough list price).
+Two frames per row, each with the shot's number and words under it, a warning
+when the shot changed after its frame was made, and a Generate or Regenerate
+button with its price (this world's average logged cost for the model, else a
+rough list price).
 
 A final frame is the finished image of a shot, rendered once by OpenAI, Gemini or Runware (Flux 2 Klein) at 1K (the video's size) from
-the shot's text and the designs of everything the scene lists, in the world's
-style. Each one can be regenerated on its own (there is no "regenerate all": it
+the shot's text and the designs of everything tagged on it (and the locations
+tagged on its scene), in the world's style. Each one can be regenerated on its own (there is no "regenerate all": it
 costs too much to be one click away); the old file stays on disk.
 """
 
@@ -19,13 +20,13 @@ import streamlit as st
 import api
 from shared.state import show_notice
 from shared.story import (
-    build_zip, episode_url, export_files, generate_shots, pick_episode, save_shot_setting, shots_in_order,
+    build_zip, episode_url, excerpt, export_files, generate_shots, pick_episode, shot_label, shots_in_order,
 )
 from shared.ui import grid
 from shared.worlds import render_world_switcher
 
 
-#: Frames per row: two leave room for the shot type and the button on one line under each.
+#: Frames per row: two leave room for the shot's words and the button under each.
 FRAME_COLUMNS = 2
 
 
@@ -44,31 +45,29 @@ def price_label(usd: Optional[float]) -> str:
     return f"~\\${amount[:-1] if amount.endswith('0') else amount}"  # 0.050 -> 0.05, 0.015 stays
 
 
-def render_grid(world: str, episode: str, script: Dict, shot_types: List[str], price: Optional[float]) -> List[Tuple[str, str]]:
-    """Every shot's final frame, scene by scene, two per row, with one line under each: the shot type
-    (saved as soon as it changes) and a priced Generate or Regenerate button. Returns the ones clicked."""
+def render_grid(world: str, episode: str, script: Dict, price: Optional[float]) -> List[Tuple[str, str]]:
+    """Every shot's final frame, scene by scene, two per row, with its words and a priced Generate or
+    Regenerate button under each. Returns the ``(label, shot id)`` of the ones clicked."""
     clicked = []
     for scene in script['scenes']:
-        if not scene['shots']:
+        shots = [shot for shot in scene['shots'] if shot['id']]
+        if not shots:
             continue
-        st.subheader(scene['heading'] or scene['id'])
-        for column, shot in grid(scene['shots'], FRAME_COLUMNS):
+        st.subheader(f"{scene['number']}. {scene['heading']}")
+        for column, shot in grid(shots, FRAME_COLUMNS):
+            label = shot_label(scene, shot)
             with column:
                 if shot.get('final_path'):
                     st.image(str(api.file_path(shot['final_path'])), width='stretch')
                 else:
-                    st.info(f"`{shot['id']}`: no frame yet.")
-                type_col, button_col = st.columns(2, vertical_alignment='center')
-                key = f"shot_type_{world}_{episode}_{scene['id']}_{shot['id']}_{st.session_state.script_revision}"
-                type_col.selectbox(
-                    "Shot type", shot_types, index=shot_types.index(shot['type']) if shot['type'] in shot_types else None,
-                    placeholder="Shot type", label_visibility='collapsed', help=f"{shot['id']}: shot type", key=key,
-                    on_change=save_shot_setting, args=(world, episode, scene['id'], shot['id'], 'type', key, True),
-                )
-                label = "Regenerate" if shot.get('final_path') else "Generate"
-                if button_col.button(f"{label} · {price_label(price)}", key=f"final_{scene['id']}_{shot['id']}",
-                                     width='stretch'):
-                    clicked.append((scene['id'], shot['id']))
+                    st.info(f"Shot {label}: no frame yet.")
+                st.caption(f"**{label}** · {excerpt(shot['action'])}")
+                warning_col, button_col = st.columns(2, vertical_alignment='center')
+                if shot['final_stale']:
+                    warning_col.warning("The shot changed after this frame.", icon=":material/sync_problem:")
+                action = "Regenerate" if shot.get('final_path') else "Generate"
+                if button_col.button(f"{action} · {price_label(price)}", key=f"final_{shot['id']}", width='stretch'):
+                    clicked.append((label, shot['id']))
     return clicked
 
 
@@ -84,6 +83,8 @@ def main() -> None:
     if not shots:
         st.info("This episode has no shots yet. Write them on the Script page.")
         return
+    if script['needs_ids']:
+        st.info("Some shots were added outside the app and are not shown. Reprocess the file on the Script page.")
 
     options = api.options()
     providers = options['final_providers']
@@ -93,7 +94,7 @@ def main() -> None:
         format_func=options['providers'].get, key=f"final_provider_{world}_{episode}",
     )
     price = frame_price(api.get(f"/worlds/{world}/costs")['entries'], provider, options['price_estimates'])
-    missing = [(scene['id'], shot['id']) for scene, shot in shots if not shot.get('final_path')]
+    missing = [(shot_label(scene, shot), shot['id']) for scene, shot in shots if not shot.get('final_path')]
 
     def batch_price(count: int) -> str:
         return price_label(price * count if price is not None else None)
@@ -112,7 +113,10 @@ def main() -> None:
             )
 
     st.divider()
-    clicked = render_grid(world, episode, script, options['shot_types'], price)
+    stale = sum(1 for _, shot in shots if shot['final_stale'])
+    if stale:
+        st.caption(f"{stale} frame(s) were made before their shot changed. Regenerate them one at a time below.")
+    clicked = render_grid(world, episode, script, price)
     to_generate = missing if generate_all else clicked
     if to_generate:
         generate_shots(world, episode, to_generate, "frame", {'provider': provider})
