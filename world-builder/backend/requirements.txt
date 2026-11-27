@@ -1,7 +1,6 @@
 fastapi==0.142.4
-google-genai==2.16.0
 httpx==0.28.1
-openai==2.52.0
+openai==2.52.0  # only as the client for Runware's OpenAI-compatible text endpoint (tagging.py)
 pillow==12.0.0
 pydantic==2.13.5
 python-dotenv==1.2.1

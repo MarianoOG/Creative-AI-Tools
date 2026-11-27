@@ -1,10 +1,14 @@
 """Characters, objects and locations: create, edit, and generate their variations. Assets live in each world's ``world.json``.
 
-Every image is rendered landscape at high quality, by one provider. A
+Every image is rendered at high quality by one model (all through Runware):
+characters and objects landscape, locations as one wide 3:1 panorama. A
 variation is rendered from the asset's preferred image (the design to keep) once
-there is one. A location's first image is always its ``establishing`` view,
-drawn from the description; its other variations are named and described freely,
-and drawn from the establishing view. Nothing here removes a file.
+there is one. A location's first image is its ``panorama`` of the whole place,
+drawn from the description; its other variations (night, after the storm...) are
+named and described freely, drawn from that first image, and stay panoramas.
+Locations made before panoramas keep their first image (``establishing``) as
+their base until it is regenerated, which renders it as a panorama. Nothing here
+removes a file.
 """
 
 from __future__ import annotations
@@ -19,10 +23,11 @@ from pydantic import BaseModel
 
 from app.assets import library, story, video
 from app.assets.generation import (
-    ASPECT_RATIOS, DEFAULT_FINAL_PROVIDER, DEFAULT_PROVIDER, FINAL_PROVIDERS, PRICE_ESTIMATES, PROVIDERS, generate_image,
+    ASPECT_RATIOS, DEFAULT_FINAL_PROVIDER, DEFAULT_PROVIDER, FINAL_PROVIDERS, PRICE_ESTIMATES,
+    PROVIDERS, generate_image,
 )
 from app.assets.prompt_manager import (
-    ASSET_DIRS, ESTABLISHING_VIEW, LEGACY_VIEW_CHANGES, STYLES, build_prompt, variation_description,
+    ASSET_DIRS, LEGACY_VIEW_CHANGES, STYLES, build_prompt, variation_description,
 )
 from app.assets.tagging import CHECKLIST, TEXT_MODEL
 from app.assets.worlds import DEFAULT_WORLD, read_style, slugify, world_dir
@@ -69,9 +74,16 @@ def _check(world: str, asset_type: str, allowed=tuple(ASSET_DIRS)) -> None:
         raise HTTPException(422, f"asset_type must be one of {sorted(allowed)}")
 
 
-def check_provider(provider: str) -> None:
+def check_provider(provider: str) -> str:
+    """``provider`` if it is a model key, or 422."""
     if provider not in PROVIDERS:
         raise HTTPException(422, f"provider must be one of {sorted(PROVIDERS)}")
+    return provider
+
+
+def _base(asset: Dict) -> Optional[str]:
+    """A location's base image, the one its other variations are drawn from: its first variation."""
+    return asset["variations"][0]["name"] if asset["variations"] else None
 
 
 def _asset(world: str, asset_type: str, name: str) -> Dict:
@@ -87,7 +99,7 @@ def _keep_uploads(world: str, label: str, uploads: List[UploadFile]) -> List[Pat
     directory.mkdir(parents=True, exist_ok=True)
     paths = []
     for index, upload in enumerate(uploads):
-        # Keep the extension: both providers read the image type off it.
+        # Keep the extension: the data URI sent to Runware takes its image type from it.
         suffix = Path(upload.filename or "").suffix.lower() or ".png"
         path = directory / f"{uuid.uuid4().hex[:8]}-{label}-ref{index + 1}{suffix}"
         path.write_bytes(upload.file.read())
@@ -96,9 +108,9 @@ def _keep_uploads(world: str, label: str, uploads: List[UploadFile]) -> List[Pat
 
 
 def _anchor(world: str, asset_type: str, asset: Dict, variation: str) -> Optional[Path]:
-    """The image a variation is drawn from: a location's establishing view, or the preferred image. Never itself."""
+    """The image a variation is drawn from: a location's base panorama, or the preferred image. Never itself."""
     if asset_type == "location":
-        candidates = [ESTABLISHING_VIEW, asset["preferred"]] if variation != ESTABLISHING_VIEW else []
+        candidates = [_base(asset)] if variation != _base(asset) else []
     else:
         candidates = [asset["preferred"]]
     for name in candidates:
@@ -114,14 +126,15 @@ def _render(world: str, asset_type: str, asset: Dict, variation: str, change: st
     style = read_style(world)
     subject = asset["description"] or asset["name"].replace("_", " ")
     anchor = _anchor(world, asset_type, asset, variation)
-    options: Dict = {}
-    if asset_type == "location" and variation == ESTABLISHING_VIEW:
+    options: Dict = {"aspect_ratio": "panorama"} if asset_type == "location" else {}
+    if asset_type == "location" and not anchor:
+        # The base panorama (or a variation whose base image is gone): drawn from the description.
         description = f"{subject}\n\n{change}".strip()
         references, clause = uploads, "location"
     elif asset_type == "location":
         change = change or LEGACY_VIEW_CHANGES.get(variation) or variation.replace("_", " ")
         description = variation_description(subject, variation, change)
-        references, clause = ([anchor, *uploads], "location_variation") if anchor else (uploads, "location")
+        references, clause = [anchor, *uploads], "location_variation"
         options["view"] = "variation"
     elif anchor:
         description = variation_description(subject, variation, change or variation.replace("_", " "))
@@ -191,7 +204,6 @@ def options() -> Dict:
         "aspect_ratios": list(ASPECT_RATIOS),
         "checklist": CHECKLIST,
         "text_model": TEXT_MODEL,
-        "establishing_view": ESTABLISHING_VIEW,
         "default_world": DEFAULT_WORLD,
         "video": {
             "model": video.VIDEO_MODEL_NAME,
@@ -259,26 +271,27 @@ def add_variation(
     provider: Annotated[str, Form()] = DEFAULT_PROVIDER,
     uploads: Annotated[List[UploadFile], File()] = [],
 ) -> Dict:
-    """Generate a named variation of any asset (new clothes, older, broken, night, a reverse angle...).
+    """Generate a named variation of any asset (new clothes, older, broken, night, after the storm...).
 
     The first one is drawn from the asset's description; later ones from its
     preferred image, with ``description`` saying what changes. A location's
-    first variation is always its ``establishing`` view (any ``variation`` name
-    is ignored); the ones after it need a ``description`` of what is different.
+    first variation is always its ``panorama`` (any ``variation`` name is
+    ignored); the ones after it are drawn from it and need a ``description`` of
+    what is different.
     ``uploads`` are inspiration, kept for regenerating.
     """
     _check(world, asset_type)
-    check_provider(provider)
+    provider = check_provider(provider)
     asset = _asset(world, asset_type, name)
     if asset_type == "location" and not asset["variations"]:
-        slug = ESTABLISHING_VIEW
+        slug = "panorama"
     else:
         slug = slugify(variation)
     if not slug:
         raise HTTPException(422, "Give the variation a name.")
     if library.variation_named(asset, slug) is not None:
         raise HTTPException(409, f"{name!r} already has a variation called {slug!r}.")
-    if asset_type == "location" and slug != ESTABLISHING_VIEW and not description.strip():
+    if asset_type == "location" and asset["variations"] and not description.strip():
         raise HTTPException(422, "Describe what is different in this variation of the location.")
     references = _keep_uploads(world, f"{name}-{slug}", uploads)
     return {"asset": _render_and_save(world, asset_type, name, slug, description.strip(), provider, references)}
@@ -288,12 +301,12 @@ def add_variation(
 def regenerate(body: Regenerate) -> Dict:
     """Re-render one variation, or all of them, from the asset's current description and their saved references.
 
-    "All" renders the preferred image (or a location's establishing view)
+    "All" renders the preferred image (or a location's base panorama)
     first, so the others, rendered in parallel after it, are drawn from its new render.
     Each variation points at its new image; the old file stays on disk.
     """
     _check(body.world, body.asset_type)
-    check_provider(body.provider)
+    provider = check_provider(body.provider)
     asset = _asset(body.world, body.asset_type, body.name)
     first = None
     if body.variation is not None:
@@ -301,10 +314,10 @@ def regenerate(body: Regenerate) -> Dict:
             raise HTTPException(404, f"{body.name!r} has no variation called {body.variation!r}")
         names = [body.variation]
     else:
-        first = ESTABLISHING_VIEW if body.asset_type == "location" else asset["preferred"]
+        first = _base(asset) if body.asset_type == "location" else asset["preferred"]
         names = sorted((v["name"] for v in asset["variations"]), key=lambda n: n != first)
         if not names:
             raise HTTPException(409, f"{body.name!r} has no variations yet.")
     variations = [library.variation_named(asset, variation_name) for variation_name in names]
     jobs = [(v["name"], v["description"], library.reference_files(body.world, v)) for v in variations]
-    return _render_many(body.world, body.asset_type, body.name, jobs, body.provider, anchor=first)
+    return _render_many(body.world, body.asset_type, body.name, jobs, provider, anchor=first)

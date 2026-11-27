@@ -143,23 +143,29 @@ _LOCATION_COMPOSITION = (
     "animals, and no foreground subject of any kind anywhere in the frame. "
 )
 
-#: The camera sentence of a location's framing. A location is first rendered in
-#: its establishing view; every variation after it is drawn from that image, and
-#: its own description says what changes (angle, time of day, weather, state...).
+#: The camera sentence of a location's framing. A location is one wide 3:1
+#: panorama of the whole place, so a shot can be framed on any part of it. Its
+#: first image is drawn from the description; every variation after it (time of
+#: day, weather, state...) is drawn from that image and stays a panorama.
 LOCATION_VIEWS: dict[str, str] = {
-    "establishing": (
-        "Wide establishing view of the space itself with a consistent single-point "
-        "perspective and a clear horizon. "
+    "panorama": (
+        "Wide panoramic view of the whole place at eye level, in a 3:1 aspect ratio, "
+        "with one continuous horizon across the full width. Spread the place's "
+        "landmarks and details across the whole width with balanced elements on the "
+        "left, in the centre and on the right, so any part of it can be cropped into a "
+        "shot of its own. "
     ),
-    "variation": "",
+    "variation": (
+        "Keep the same wide 3:1 panoramic composition and layout as the first "
+        "reference image, across its full width. "
+    ),
 }
-#: The view a location is first rendered in, and the one its variations are drawn from.
-ESTABLISHING_VIEW = next(iter(LOCATION_VIEWS))
+
 #: What the fixed views of earlier versions showed, used when one of them is regenerated without a description.
 LEGACY_VIEW_CHANGES: dict[str, str] = {
     "reverse": (
         "Reverse angle: the camera stands on the far side of the space and looks back "
-        "towards where the establishing view was taken, so the opposite side of the same "
+        "towards where the first view was taken, so the opposite side of the same "
         "place fills the frame, with a consistent single-point perspective and a clear horizon."
     ),
     "detail": (
@@ -268,7 +274,7 @@ REFERENCE_CLAUSES: dict[str, str] = {
         "The first reference image is the established design of this exact "
         "location, and it is fact, not inspiration: keep its layout, architecture, "
         "materials and colour palette, and change only what the variation above "
-        "describes (a different angle, time of day, weather or state of the place). "
+        "describes (a time of day, weather or state of the place). "
         "Do not invent a different or neighbouring place, and keep it empty of "
         "figures. Any further reference images are inspiration for that change "
         "only; do not adopt their art style. The style is defined by the style "
@@ -281,7 +287,10 @@ REFERENCE_CLAUSES: dict[str, str] = {
         "proportions, costume, materials and colour palette exactly. Character "
         "and object references are turnaround sheets on white: draw each subject "
         "once, inside the scene, never as a sheet of views. Location references "
-        "are empty background plates of the place where the frame happens. "
+        "are empty background plates of the place where the frame happens; a wide "
+        "panoramic plate shows the whole place, so frame the shot on whichever part "
+        "of it suits the action, as a camera standing in that place would see it, and "
+        "never squeeze the whole panorama into the frame. "
         "The style is defined by the style description above."
     ),
 }
@@ -297,7 +306,7 @@ def build_prompt(
     description: str,
     style: str,
     clause: str | None = None,
-    view: str = ESTABLISHING_VIEW,
+    view: str = "panorama",
 ) -> str:
     """Compose the full prompt for one image. For a final frame, ``description`` is the situation to depict.
 

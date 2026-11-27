@@ -5,10 +5,13 @@ from __future__ import annotations
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException
+from PIL import Image
 from pydantic import BaseModel
 
 from app.assets import library, story, video
-from app.assets.generation import ASPECT_RATIOS, FINAL_PROVIDERS, FINAL_QUALITY, FINAL_RESOLUTION, generate_image
+from app.assets.generation import (
+    ASPECT_RATIOS, FINAL_PROVIDERS, FINAL_QUALITY, FINAL_RESOLUTION, generate_image,
+)
 from app.assets.prompt_manager import ASSET_DIRS
 from app.assets.worlds import read_style, read_world
 from app.routers.common import call, check_world, provider_errors
@@ -48,7 +51,7 @@ class Version(BaseModel):
 
 
 class FinalFrame(BaseModel):
-    #: The final frame's model (``openai``, ``gemini`` or ``runware``); the episode's last one when left out.
+    #: The final frame's model (a key of ``generation.MODELS``); the episode's last one when left out.
     provider: Optional[str] = None
 
 
@@ -177,6 +180,15 @@ def _cast(world: str, scene: Dict, shot: Dict) -> List[str]:
     return cast
 
 
+def _is_panorama(path) -> bool:
+    """Whether a location image is a wide panorama (wider than 2:1) rather than an older single view."""
+    try:
+        with Image.open(path) as image:
+            return image.width > 2 * image.height
+    except OSError:
+        return False
+
+
 def _final_references(world: str, scene: Dict, shot: Dict) -> tuple[List, List[str]]:
     """A final frame's references: the design of each asset tagged on the shot, with one label per image."""
     paths, labels = [], []
@@ -186,7 +198,10 @@ def _final_references(world: str, scene: Dict, shot: Dict) -> tuple[List, List[s
         for reference in tagged[folder]:
             if reference in designs and designs[reference] not in paths:
                 paths.append(designs[reference])
-                labels.append(f"{reference.replace(':', ' ').replace('_', ' ')} ({asset_type} design)")
+                kind = f"{asset_type} design"
+                if asset_type == "location" and _is_panorama(designs[reference]):
+                    kind = "location panorama: the whole place, frame the shot on the part that fits"
+                labels.append(f"{reference.replace(':', ' ').replace('_', ' ')} ({kind})")
     return paths, labels
 
 
@@ -203,7 +218,7 @@ def _shot(world: str, episode: str, shot: str) -> tuple[Dict, Dict, Dict, Option
 def generate_shot(world: str, episode: str, shot: str, body: Optional[FinalFrame] = None) -> Dict:
     """Render a shot's final frame, replacing the one it had (whose file stays on disk).
 
-    It uses OpenAI (medium quality), Gemini or Runware (Flux 2 Klein) at 1K, the size of the video, in the episode's
+    It uses one of the Runware image models (the GPT ones at medium quality) at 1K, the size of the video, in the episode's
     aspect ratio and the world's style. It is sent the design of every character and object tagged on the
     shot and every location tagged on its scene, their descriptions, and the scene's heading and summary and
     the shot's action (not its dialogue).

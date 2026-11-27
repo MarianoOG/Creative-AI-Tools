@@ -136,7 +136,7 @@ def render_cost_summary(world: str) -> None:
     costs = api.get(f"/worlds/{world}/costs")
     if not costs['entries']:
         return
-    note = " (estimated where a provider does not bill by the image)" if any(
+    note = " (estimated for renders made before everything went through Runware)" if any(
         e['estimated'] for e in costs['entries']
     ) else ""
     st.caption(f"Spent on renders in **{world}** so far: **${costs['total']:.2f}**{note}.")

@@ -5,7 +5,7 @@ when the shot changed after its frame was made, and a Generate or Regenerate
 button with its price (this world's average logged cost for the model, else a
 rough list price).
 
-A final frame is the finished image of a shot, rendered once by OpenAI, Gemini or Runware (Flux 2 Klein) at 1K (the video's size) from
+A final frame is the finished image of a shot, rendered once by one of the Runware image models at 1K (the video's size) from
 the shot's text and the designs of everything tagged on it (and the locations
 tagged on its scene), in the world's style. Each one can be regenerated on its own (there is no "regenerate all": it
 costs too much to be one click away); the old file stays on disk.
@@ -32,7 +32,7 @@ FRAME_COLUMNS = 2
 
 def frame_price(world_costs: List[Dict], provider: str, estimates: Dict) -> Optional[float]:
     """What one frame costs with ``provider``: the average of this world's logged final frames by it,
-    else the provider's rough list price (``None`` for OpenAI, which bills per token)."""
+    else the model's rough list price."""
     logged = [e['usd'] for e in world_costs if e['asset_type'] == "final" and e['provider'] == provider]
     return sum(logged) / len(logged) if logged else estimates.get(provider)
 

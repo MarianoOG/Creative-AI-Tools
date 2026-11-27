@@ -12,7 +12,7 @@ objects) and each shot's clip length. Nothing in ``episode.json`` repeats it.
 
 **episode.json** holds what cannot be written in a screenplay::
 
-    {"aspect_ratio": "landscape", "final_provider": "gemini",
+    {"aspect_ratio": "landscape", "final_provider": "nano-banana",
      "shots": {"a3f9c2": {"final": "shots/1a2b3c4d-a3f9c2-final.jpg", "final_hash": "...",
                           "video": "shots/9a8b7c6d-a3f9c2-video.mp4", "video_hash": "...", "video_final": "shots/1a2b...jpg",
                           "end_on_next": false, "tags_manual": false, "check": {"hash": "...", "missing": [...]}}},
@@ -108,10 +108,10 @@ def _new_id(taken: set) -> str:
 
 
 def _clean_meta(raw: Dict) -> Dict:
+    final_provider = raw.get("final_provider")
     return {
         "aspect_ratio": raw.get("aspect_ratio") if raw.get("aspect_ratio") in ASPECT_RATIOS else "landscape",
-        "final_provider": raw.get("final_provider") if raw.get("final_provider") in FINAL_PROVIDERS
-        else DEFAULT_FINAL_PROVIDER,
+        "final_provider": final_provider if final_provider in FINAL_PROVIDERS else DEFAULT_FINAL_PROVIDER,
         "shots": {str(key): value for key, value in (raw.get("shots") or {}).items() if isinstance(value, dict)},
         "scenes": {str(key): value for key, value in (raw.get("scenes") or {}).items() if isinstance(value, dict)},
     }

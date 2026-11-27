@@ -22,7 +22,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
-from app.assets.prompt_manager import ASSET_DIRS, ESTABLISHING_VIEW, LEGACY_STYLE_SLUGS
+from app.assets.prompt_manager import ASSET_DIRS, LEGACY_STYLE_SLUGS
 from app.settings import WORLDS_DIR
 
 #: The world listed when there is none on disk yet.
@@ -32,6 +32,8 @@ WORLD_FILE = "world.json"
 LEGACY_STYLE_FILE = "style.txt"
 #: The variation name a pre-``world.json`` character or object file gets.
 LEGACY_VARIATION = "original"
+#: What that one image is called for a location (locations were single views before they became panoramas).
+LEGACY_LOCATION_VARIATION = "establishing"
 #: Where deleted worlds, episodes and scenes are moved, inside their parent folder.
 DELETED_DIR = ".deleted"
 
@@ -113,7 +115,7 @@ def images_in(directory: Path) -> List[Path]:
 
 
 def first_variation(asset_type: str) -> str:
-    return ESTABLISHING_VIEW if asset_type == "location" else LEGACY_VARIATION
+    return LEGACY_LOCATION_VARIATION if asset_type == "location" else LEGACY_VARIATION
 
 
 def legacy_name(path: Path) -> Tuple[str, str]:

@@ -124,20 +124,21 @@ def render_variations(asset: Dict, provider: str) -> None:
 def render_new_variation(asset: Dict, options: Dict, provider: str) -> None:
     key = asset_key(asset)
     location = asset['asset_type'] == 'location'
-    establishing = location and not asset['variations']
-    st.subheader("Establishing shot" if establishing else "New variation")
-    if establishing:
-        st.caption("Drawn from the description, and becomes the preferred image. Every other variation is drawn from it.")
-        name, change = options['establishing_view'], ""
+    panorama = location and not asset['variations']
+    st.subheader("Panorama" if panorama else "New variation")
+    if panorama:
+        st.caption("One wide 3:1 panorama of the whole place, drawn from the description. It becomes the preferred "
+                   "image, every other variation is drawn from it, and final frames crop whatever angle a shot needs.")
+        name, change = "panorama", ""
     else:
         if asset['variations']:
-            source = options['establishing_view'] if location else asset['preferred']
-            st.caption(f"Drawn from the {'establishing shot' if location else 'preferred image'} "
+            source = asset['variations'][0]['name'] if location else asset['preferred']
+            st.caption(f"Drawn from the {'base panorama' if location else 'preferred image'} "
                        f"(**{source}**), changed as described.")
         else:
             st.caption("The first variation is drawn from the description, and becomes the preferred one.")
         name = st.text_input("Variation name", placeholder="night" if location else "older", key=f"variation_name_{key}")
-        placeholder = ("Reverse angle from the far end, lanterns lit, after dusk." if location
+        placeholder = ("After dusk, lanterns lit, puddles from the rain." if location
                        else "Twenty years older, grey fur, a walking stick.")
         change = st.text_area(
             "What is different" if location else "What is different (optional)", placeholder=placeholder,
@@ -146,8 +147,8 @@ def render_new_variation(asset: Dict, options: Dict, provider: str) -> None:
     uploads = reference_uploader(
         f"variation_uploads_{key}", "Inspiration, never the art style. Kept, so a regenerate uses them again."
     )
-    ready = bool(name.strip()) and (bool(change.strip()) or not location or establishing)
-    label = "Generate establishing shot" if establishing else "Generate variation"
+    ready = bool(name.strip()) and (bool(change.strip()) or not location or panorama)
+    label = "Generate panorama" if panorama else "Generate variation"
     if st.button(label, type="primary", disabled=not ready, key=f"variation_go_{key}"):
         data = body(asset, variation=name, description=change, provider=provider)
         with show_errors(), st.spinner(WAIT):
@@ -167,7 +168,8 @@ def main() -> None:
         return
     asset = pick_asset(assets)
     st.title(asset['name'])
-    st.caption(f"{asset['asset_type'].capitalize()} in **{world}** · landscape, high quality")
+    shape = "3:1 panorama" if asset['asset_type'] == 'location' else "landscape"
+    st.caption(f"{asset['asset_type'].capitalize()} in **{world}** · {shape}, high quality")
     show_notice()
 
     render_details(asset)
