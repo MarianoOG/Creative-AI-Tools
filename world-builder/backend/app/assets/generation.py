@@ -1,12 +1,14 @@
-"""Image generation with OpenAI (gpt-image-2), Gemini (Nano Banana 2) or Runware (Flux 2 Klein 4B), one provider per image.
+"""Image generation, all through Runware: OpenAI GPT-Image-2.6 (Sunburst or Flare), Google Nano Banana 2.1 or Flux 2 Klein 4B.
 
+One model renders each image. Every model is reached with the one Runware key
+and the same ``imageInference`` task; only the fields a model takes differ.
 Files are written to the folder the caller passes (an asset-type folder, or a
-scene folder for shots) as ``{uuid8}-{label}``, with the extension of the
-returned bytes (OpenAI PNG, Gemini and Runware JPEG). Characters, objects and
-locations render at 2K and high quality: they are made once and every frame is
-built from them. Final frames render at 1K (the size of the 768p video they
-become) with OpenAI at medium quality. Every render gets a new uuid, so nothing
-is ever overwritten.
+shot folder for final frames) as ``{uuid8}-{label}``, as JPEG. Characters and
+objects render at 2K and high quality; a location renders as one wide 3:1
+panorama of the whole place, which final frames crop into whatever angle a shot
+needs. Final frames render at 1K (the size of the 768p video they become), the
+GPT models at medium quality. Every render gets a new uuid, so nothing is ever
+overwritten. Runware reports what each task billed, so every logged cost is exact.
 """
 
 from __future__ import annotations
@@ -17,59 +19,88 @@ import os
 import uuid
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Optional, Sequence
+from typing import Any, Dict, Optional, Sequence
 
 from PIL import Image
 
 from app.assets import costs
 from app.assets.prompt_manager import build_prompt
 
-OPENAI_MODEL = "gpt-image-2"
-GEMINI_MODEL = "gemini-nano-banana-2.1"
-RUNWARE_MODEL = "runware:400@4"
 RUNWARE_URL = "https://api.runware.ai/v1"
-#: Provider -> the name the forms show. The price hints are rough (landscape, 2K, high quality - what
-#: character, object and location renders always use); the exact figure is logged after each render.
-PROVIDERS = {
-    "openai": f"OpenAI {OPENAI_MODEL} (billed per token, varies)",
-    "gemini": "Gemini Nano Banana 2 (~$0.05/image)",
-    "runware": "Runware Flux 2 Klein 4B (~$0.015/image)",
+
+#: Model key (what ``world.json``, ``episode.json`` and the API call ``provider``) -> its Runware model,
+#: the name the forms show, and the most reference images it takes. Price hints are rough; the exact
+#: figure is logged after each render.
+MODELS: Dict[str, Dict[str, Any]] = {
+    "gpt-image-sunburst": {
+        "air": "openai:gpt-image@2.6-sunburst", "family": "gpt",
+        "label": "GPT-Image-2.6 Sunburst (detailed, precise; ~$0.04-0.19/image)", "max_references": 16,
+    },
+    "gpt-image-flare": {
+        "air": "openai:gpt-image@2.6-flare", "family": "gpt",
+        "label": "GPT-Image-2.6 Flare (fast iteration; ~$0.06-0.19/image)", "max_references": 16,
+    },
+    "nano-banana": {
+        "air": "google:nano-banana@2.1", "family": "nano-banana",
+        "label": "Nano Banana 2.1 (~$0.03-0.05/image)", "max_references": 14,
+    },
+    "flux-klein": {
+        "air": "runware:400@4", "family": "flux",
+        "label": "Flux 2 Klein 4B (cheap and fast, ~$0.015/image)", "max_references": 4,
+    },
 }
-DEFAULT_PROVIDER = "openai"
+#: The name each model shows in the forms.
+PROVIDERS = {key: model["label"] for key, model in MODELS.items()}
+DEFAULT_PROVIDER = "gpt-image-sunburst"
+#: What episodes and variations made before everything went through Runware called their model.
+LEGACY_PROVIDERS = {"openai": "gpt-image-sunburst", "gemini": "nano-banana", "runware": "flux-klein"}
 #: Rough USD per final frame (1K), shown on the Storyboard until the world's cost log has real ones.
-#: OpenAI bills per token, so it has no fixed figure.
-PRICE_ESTIMATES = {"openai": None, "gemini": 0.034, "runware": 0.007}
+PRICE_ESTIMATES = {"gpt-image-sunburst": 0.07, "gpt-image-flare": 0.17, "nano-banana": 0.034, "flux-klein": 0.007}
 #: The models a final frame can use (all of them), and the default one.
 FINAL_PROVIDERS = tuple(PROVIDERS)
-DEFAULT_FINAL_PROVIDER = "gemini"
+DEFAULT_FINAL_PROVIDER = "nano-banana"
 
-#: Friendly name -> the ratio Gemini takes.
+
+def model_key(provider: Optional[str]) -> Optional[str]:
+    """A model key, translating the provider names older files used (``openai``, ``gemini``, ``runware``)."""
+    return LEGACY_PROVIDERS.get(provider or "", provider)
+
+
+#: Friendly name -> ratio. ``panorama`` is for locations only; episodes pick one of the other three.
 ASPECT_RATIOS = {"landscape": "16:9", "square": "1:1", "portrait": "9:16"}
+PANORAMA = "panorama"
 
-#: Resolution -> ratio -> the (width, height) OpenAI and Runware render (both sides divisible by 16).
-#: Gemini takes the resolution name itself. 1K matches the 768p video a final frame becomes.
-SIZES = {
-    "2K": {"16:9": (2048, 1152), "1:1": (2048, 2048), "9:16": (1152, 2048)},
-    "1K": {"16:9": (1360, 768), "1:1": (1024, 1024), "9:16": (768, 1360)},
+#: Model family -> resolution -> ratio -> (width, height). The GPT models take any size (sides
+#: divisible by 16, 1:3 to 3:1); Nano Banana only the sizes its table lists, and no 3:1 (its
+#: panorama is 21:9); Flux 2 Klein stays within 2048 a side. 1K matches the 768p video.
+SIZES: Dict[str, Dict[str, Dict[str, tuple[int, int]]]] = {
+    "gpt": {
+        "2K": {"16:9": (2048, 1152), "1:1": (2048, 2048), "9:16": (1152, 2048), "3:1": (3072, 1024)},
+        "1K": {"16:9": (1360, 768), "1:1": (1024, 1024), "9:16": (768, 1360)},
+    },
+    "nano-banana": {
+        "2K": {"16:9": (2752, 1536), "1:1": (2048, 2048), "9:16": (1536, 2752), "3:1": (3168, 1344)},
+        "1K": {"16:9": (1376, 768), "1:1": (1024, 1024), "9:16": (768, 1376)},
+    },
+    "flux": {
+        "2K": {"16:9": (2048, 1152), "1:1": (2048, 2048), "9:16": (1152, 2048), "3:1": (2048, 688)},
+        "1K": {"16:9": (1360, 768), "1:1": (1024, 1024), "9:16": (768, 1360)},
+    },
 }
 
-#: Provider -> the most reference images it takes (the API limits).
-MAX_REFERENCES = {"runware": 4, "openai": 16, "gemini": 14}
-
-#: Quality -> (OpenAI ``quality``, Gemini ``thinking_level``). The Gemini model
-#: rejects every thinking level but "high", so below that nothing is sent.
-#: Runware has no quality setting: it always renders the same way.
+#: Quality -> (GPT ``settings.quality``, Nano Banana ``settings.thinkingLevel``). Flux has no quality setting.
 QUALITY: dict[str, tuple[str, Optional[str]]] = {
     "low": ("low", None),
     "medium": ("medium", None),
     "high": ("high", "high"),
-    # Final frames: OpenAI at medium (enough for a 768p video, and much cheaper), Gemini unchanged.
+    # Final frames: GPT at medium (enough for a 768p video, and much cheaper), Nano Banana unchanged.
     "frame": ("medium", "high"),
 }
 
-#: Characters, objects and locations are always rendered like this; final
-#: frames take their ratio from the episode, at high quality.
+#: Characters and objects are always rendered like this; locations as a panorama;
+#: final frames take their ratio from the episode.
 ASSET_ASPECT_RATIO = "landscape"
+LOCATION_ASPECT_RATIO = PANORAMA
 ASSET_QUALITY = "high"
 ASSET_RESOLUTION = "2K"
 #: Final frames only feed the video, so they render at its size.
@@ -94,87 +125,50 @@ def _base64(path: Path) -> str:
     return base64.b64encode(path.read_bytes()).decode()
 
 
-def _openai_bytes(prompt: str, size: str, quality: str, references: list[Path]) -> tuple[bytes, Any]:
-    from openai import OpenAI
-
-    client = OpenAI(api_key=_api_key("OPENAI_API_KEY"))
-    options = dict(model=OPENAI_MODEL, prompt=prompt, size=size, quality=quality, output_format="png")
-    if references:
-        handles = [path.open("rb") for path in references]
-        try:
-            result = client.images.edit(image=handles, **options)
-        finally:
-            for handle in handles:
-                handle.close()
-    else:
-        result = client.images.generate(**options)
-
-    if not result.data or not result.data[0].b64_json:
-        raise RuntimeError("OpenAI returned no image data")
-    return base64.b64decode(result.data[0].b64_json), result.usage
+def image_size(provider: str, aspect_ratio: str, resolution: str) -> tuple[int, int]:
+    """The (width, height) ``provider`` renders for an aspect ratio name and a resolution."""
+    ratio = "3:1" if aspect_ratio == PANORAMA else ASPECT_RATIOS[aspect_ratio]
+    return SIZES[MODELS[provider]["family"]][resolution][ratio]
 
 
-def _gemini_bytes(
-    prompt: str, ratio: str, image_size: str, thinking_level: Optional[str], references: list[Path]
-) -> tuple[bytes, Any]:
-    from google import genai
-
-    client = genai.Client(api_key=_api_key("GEMINI_API_KEY"))
-    model_input: str | list[dict] = prompt
-    if references:
-        model_input = [{"type": "text", "text": prompt}] + [
-            {
-                "type": "image",
-                "data": _base64(path),
-                "mime_type": _mime_type(path),
-            }
-            for path in references
-        ]
-    config: dict[str, Any] = {}
-    if thinking_level:
-        config["generation_config"] = {"thinking_level": thinking_level}
-
-    interaction = client.interactions.create(
-        model=GEMINI_MODEL,
-        input=model_input,
-        # image/jpeg is the only image mime type the API accepts.
-        response_format={"type": "image", "aspect_ratio": ratio, "image_size": image_size, "mime_type": "image/jpeg"},
-        **config,
-    )
-    # Success has been reported under more than one status, so check for the image itself.
-    output = getattr(interaction, "output_image", None)
-    if output is None or not output.data:
-        raise RuntimeError(f"Gemini returned no image data (status={getattr(interaction, 'status', None)})")
-    return base64.b64decode(output.data), interaction.usage
-
-
-def _runware_bytes(prompt: str, size: tuple[int, int], references: list[Path]) -> tuple[bytes, Optional[float]]:
-    import httpx
-
+def runware_task(provider: str, prompt: str, size: tuple[int, int], quality: str,
+                 references: Sequence[str] = ()) -> Dict[str, Any]:
+    """The ``imageInference`` task for one image. ``references`` are already data URIs (or URLs)."""
+    model = MODELS[provider]
+    gpt_quality, thinking_level = QUALITY[quality]
     width, height = size
-    task: dict[str, Any] = {
+    task: Dict[str, Any] = {
         "taskType": "imageInference",
         "taskUUID": str(uuid.uuid4()),
-        "model": RUNWARE_MODEL,
+        "model": model["air"],
         "positivePrompt": prompt,
         "width": width,
         "height": height,
-        "steps": 4,
-        "CFGScale": 3.5,
-        "acceleration": "high",
         "numberResults": 1,
         "outputType": "base64Data",
         "outputFormat": "JPG",
         "outputQuality": 95,
         "deliveryMethod": "sync",
-        # Reports the exact USD this task billed, on the image result (see ``cost`` below).
+        # Reports the exact USD this task billed, on the image result.
         "includeCost": True,
     }
+    if model["family"] == "gpt":
+        task["settings"] = {"quality": gpt_quality}
+    elif model["family"] == "nano-banana":
+        if thinking_level:
+            task["settings"] = {"thinkingLevel": thinking_level}
+    else:
+        task.update({"steps": 4, "CFGScale": 3.5, "acceleration": "high"})
     if references:
-        task["inputs"] = {"referenceImages": [f"data:{_mime_type(path)};base64,{_base64(path)}" for path in references]}
+        task["inputs"] = {"referenceImages": list(references)}
+    return task
+
+
+def _runware_bytes(task: Dict[str, Any]) -> tuple[bytes, Optional[float]]:
+    import httpx
 
     response = httpx.post(
-        RUNWARE_URL, json=[task], headers={"Authorization": f"Bearer {_api_key('RUNWARE_API_KEY')}"}, timeout=180
+        RUNWARE_URL, json=[task], headers={"Authorization": f"Bearer {_api_key('RUNWARE_API_KEY')}"}, timeout=300
     )
     body = response.json()
     if body.get("errors"):
@@ -196,39 +190,34 @@ def generate_image(
     provider: str,
     references: Sequence[Path] = (),
     clause: Optional[str] = None,
-    view: str = "establishing",
+    view: str = "panorama",
     aspect_ratio: str = ASSET_ASPECT_RATIO,
     quality: str = ASSET_QUALITY,
     resolution: str = ASSET_RESOLUTION,
 ) -> Path:
-    """Render one image (an asset, or a shot's ``"final"`` frame) with one provider and save it as ``{uuid8}-{label}`` in ``directory``.
+    """Render one image (an asset, or a shot's ``"final"`` frame) with one model and save it as ``{uuid8}-{label}`` in ``directory``.
 
+    ``provider`` is a model key (see :data:`MODELS`; older names are translated).
     ``clause`` says how ``references`` are used (see ``build_prompt``). Raises
-    if the provider fails; nothing is written then. What it billed is appended
-    to ``world``'s cost log (exact for Runware, estimated for OpenAI and Gemini).
+    if Runware fails; nothing is written then. What it billed is appended to
+    ``world``'s cost log.
     """
-    if provider not in PROVIDERS:
-        raise ValueError(f"provider must be one of {sorted(PROVIDERS)}")
-    references = list(references)[: MAX_REFERENCES.get(provider)]
+    provider = model_key(provider)
+    if provider not in MODELS:
+        raise ValueError(f"provider must be one of {sorted(MODELS)}")
+    references = list(references)[: MODELS[provider]["max_references"]]
     prompt = build_prompt(asset_type, description, style, clause=clause if references else None, view=view)
-    ratio = ASPECT_RATIOS[aspect_ratio]
-    openai_quality, thinking_level = QUALITY[quality]
-    if provider == "openai":
-        width, height = SIZES[resolution][ratio]
-        data, usage = _openai_bytes(prompt, f"{width}x{height}", openai_quality, references)
-        usd, estimated = costs.openai_cost(usage), True
-    elif provider == "runware":
-        data, cost = _runware_bytes(prompt, SIZES[resolution][ratio], references)
-        usd, estimated = cost, False
-    else:
-        data, usage = _gemini_bytes(prompt, ratio, resolution, thinking_level, references)
-        usd, estimated = costs.gemini_cost(usage), True
+    task = runware_task(
+        provider, prompt, image_size(provider, aspect_ratio, resolution), quality,
+        [f"data:{_mime_type(path)};base64,{_base64(path)}" for path in references],
+    )
+    data, usd = _runware_bytes(task)
     image_format = Image.open(BytesIO(data)).format
-    path = directory / f"{uuid.uuid4().hex[:8]}-{label}{_EXTENSIONS.get(image_format, '.png')}"
+    path = directory / f"{uuid.uuid4().hex[:8]}-{label}{_EXTENSIONS.get(image_format, '.jpg')}"
     directory.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
     try:
-        costs.record(world, asset_type, label, provider, usd, estimated)
+        costs.record(world, asset_type, label, provider, usd, estimated=False)
     except Exception:
         pass  # a logging bug must never cost an already-paid-for render.
     return path

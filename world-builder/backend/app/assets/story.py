@@ -12,7 +12,7 @@ objects) and each shot's clip length. Nothing in ``episode.json`` repeats it.
 
 **episode.json** holds what cannot be written in a screenplay::
 
-    {"aspect_ratio": "landscape", "final_provider": "gemini",
+    {"aspect_ratio": "landscape", "final_provider": "nano-banana",
      "shots": {"a3f9c2": {"final": "shots/1a2b3c4d-a3f9c2-final.jpg", "final_hash": "...",
                           "video": "shots/9a8b7c6d-a3f9c2-video.mp4", "video_hash": "...", "video_final": "shots/1a2b...jpg",
                           "end_on_next": false, "tags_manual": false, "check": {"hash": "...", "missing": [...]}}},
@@ -42,7 +42,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from app.assets import fountain, sync, tagging
-from app.assets.generation import ASPECT_RATIOS, DEFAULT_FINAL_PROVIDER, FINAL_PROVIDERS
+from app.assets.generation import ASPECT_RATIOS, DEFAULT_FINAL_PROVIDER, FINAL_PROVIDERS, model_key
 from app.assets.video import DEFAULT_DURATION, DURATIONS
 from app.assets.worlds import (
     child_dir, existing_dir, move_to_deleted, new_child_dir, read_world, subfolders, world_dir, write_json,
@@ -108,10 +108,10 @@ def _new_id(taken: set) -> str:
 
 
 def _clean_meta(raw: Dict) -> Dict:
+    final_provider = model_key(raw.get("final_provider"))
     return {
         "aspect_ratio": raw.get("aspect_ratio") if raw.get("aspect_ratio") in ASPECT_RATIOS else "landscape",
-        "final_provider": raw.get("final_provider") if raw.get("final_provider") in FINAL_PROVIDERS
-        else DEFAULT_FINAL_PROVIDER,
+        "final_provider": final_provider if final_provider in FINAL_PROVIDERS else DEFAULT_FINAL_PROVIDER,
         "shots": {str(key): value for key, value in (raw.get("shots") or {}).items() if isinstance(value, dict)},
         "scenes": {str(key): value for key, value in (raw.get("scenes") or {}).items() if isinstance(value, dict)},
     }
@@ -537,6 +537,7 @@ def set_settings(world: str, episode: str, aspect_ratio: Optional[str] = None,
                 raise ValueError(f"aspect_ratio must be one of {list(ASPECT_RATIOS)}")
             meta["aspect_ratio"] = aspect_ratio
         if final_provider is not None:
+            final_provider = model_key(final_provider)
             if final_provider not in FINAL_PROVIDERS:
                 raise ValueError(f"final_provider must be one of {list(FINAL_PROVIDERS)}")
             meta["final_provider"] = final_provider

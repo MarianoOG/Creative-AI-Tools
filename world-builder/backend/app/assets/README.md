@@ -1,13 +1,17 @@
 # Worlds, assets and stories
 
-Four kinds of image, each rendered by one provider, OpenAI (`gpt-image-2`),
-Gemini (Nano Banana 2) or Runware (Flux 2 Klein), always in the world's style:
+Four kinds of image, each rendered by one model, always in the world's style.
+Every model goes through Runware with one key: OpenAI GPT-Image-2.6 Sunburst
+(`gpt-image-sunburst`) or Flare (`gpt-image-flare`), Google Nano Banana 2.1
+(`nano-banana`) or Flux 2 Klein 4B (`flux-klein`). Files from before keep the
+older names (`openai`, `gemini`, `runware`); they are read as those models.
+
 
 | Type | What it renders | References are treated as |
 | --- | --- | --- |
 | `character` | Turnaround sheet: front, three-quarter, back on white | inspiration (uploads) |
 | `object` | Turnaround sheet: front isometric and side views on white | inspiration (uploads) |
-| `location` | Empty background plate, no figures, establishing shot first | inspiration (uploads) |
+| `location` | One wide 3:1 panorama of the empty place, no figures | inspiration (uploads) |
 | `final` | A shot's frame | the scene's assets as designs to reproduce faithfully |
 
 An asset is created as just a name and a description, with no images. Its
@@ -17,13 +21,21 @@ first one made, until another is picked):
 - Characters and objects take any named variation (new clothes, older, broken,
   dirty...). The first is drawn from the description; later ones from the
   preferred image, as the design to keep, plus what the variation says changes.
-- A location works the same way, except that its first image is always the
-  `establishing` shot, drawn from the description. Its other variations are
-  named and described freely (a reverse angle, night, after the storm...) and
-  drawn from the establishing shot as the same empty place.
+- A location works the same way, except that its first image is always its
+  `panorama`: one wide 3:1 image of the whole place (3072×1024 with the GPT
+  models; 21:9 with Nano Banana, which has no 3:1), drawn from the description,
+  with its details spread across the full width so a final frame can be framed
+  on any part of it. Its other variations are named and described freely
+  (night, after the storm...), drawn from that first image as the same empty
+  place, and stay panoramas. A final frame is told a location reference is a
+  panorama and to frame the shot on the part that fits.
+- Locations made before panoramas keep their first variation (`establishing`)
+  as their base, and old views (`reverse`, `detail`) keep working in frames.
+  Regenerating the base renders it as a panorama, and regenerating all renders
+  the base first and the rest from it, so one "Regenerate all" converts a location.
 
 Any variation can be regenerated, or all of them at once (the preferred image,
-or the establishing view, first), from the asset's current description and the
+or a location's base panorama, first), from the asset's current description and the
 reference images it was made with.
 
 - `prompt_manager.py`: prompt text (style presets, framing per type, location camera, reference clauses). No I/O.
@@ -36,8 +48,8 @@ reference images it was made with.
 - `tagging.py`: tags and the checklist from the text model (Claude Haiku on Runware by default).
 - `video.py`: shot videos (Runware MiniMax H3 Fast) and their prompt.
 
-The HTTP API is in `app/routers/`. Keys (`OPENAI_API_KEY`, `GEMINI_API_KEY`) go
-in `backend/.env`.
+The HTTP API is in `app/routers/`. The one key (`RUNWARE_API_KEY`) goes in
+`backend/.env`.
 
 ## Files
 
@@ -60,8 +72,8 @@ data/assets/
 ```
 
 New files are named `{uuid8}-{name}-{variation}` (final frames: `{uuid8}-{shot id}-final`). Every
-render gets a new uuid, so nothing is overwritten. OpenAI writes PNG and Gemini
-JPEG; assets are 2K, final frames 1K (the size of the 768p video).
+render gets a new uuid, so nothing is overwritten. New renders are JPEG (older
+OpenAI ones are PNG); assets are 2K, final frames 1K (the size of the 768p video).
 
 The files decide what exists: an image that no `world.json` or `episode.json`
 entry points at is an orphan and is never shown. Removing an asset, a variation
@@ -79,14 +91,14 @@ hidden `.deleted/` folder beside it.
     "description": "A young red fox in a green scarf.",
     "preferred": "young",
     "variations": [
-      {"name": "young", "description": "", "provider": "openai", "image": "1a2b3c4d-fox_hero-young.png",
+      {"name": "young", "description": "", "provider": "gpt-image-sunburst", "image": "1a2b3c4d-fox_hero-young.jpg",
        "references": ["9f8e7d6c-fox_hero-young-ref1.png"]},
-      {"name": "older", "description": "Twenty years older, grey muzzle.", "provider": "gemini",
+      {"name": "older", "description": "Twenty years older, grey muzzle.", "provider": "nano-banana",
        "image": "5e6f7a8b-fox_hero-older.jpg", "references": []}
     ]
   }],
   "locations": [{"name": "night_market", "description": "...", "variations": [
-    {"name": "establishing", "...": "..."}, {"name": "night", "description": "After dusk, lanterns lit.", "...": "..."}
+    {"name": "panorama", "...": "..."}, {"name": "night", "description": "After dusk, lanterns lit.", "...": "..."}
   ]}],
   "objects": []
 }
@@ -133,7 +145,7 @@ but empty means "tagged, nothing in it"; a missing one means "not tagged yet".
 ```json
 {
   "aspect_ratio": "landscape",
-  "final_provider": "gemini",
+  "final_provider": "nano-banana",
   "shots": {"a3f9c2": {
     "final": "shots/3a4b5c6d-a3f9c2-final.jpg", "final_hash": "...",
     "video": "shots/7e8f9a0b-a3f9c2-video.mp4", "video_hash": "...", "video_final": "shots/3a4b5c6d-a3f9c2-final.jpg",
@@ -175,21 +187,21 @@ but empty means "tagged, nothing in it"; a missing one means "not tagged yet".
 
 `POST /assets` creates an asset (no images) and `PATCH /assets` renames it,
 changes its description or picks its preferred variation. `POST
-/assets/variations` (any asset; a location's first is its establishing shot), `POST /assets/regenerate` and
+/assets/variations` (any asset; a location's first is its panorama), `POST /assets/regenerate` and
 `POST /worlds/{world}/episodes/{episode}/shots/{shot}/generate`
 wait for the render and return the result. Each image is rendered by one
-`provider` (`openai`, `gemini` or `runware`).
+`provider` (`gpt-image-sunburst`, `gpt-image-flare`, `nano-banana` or `flux-klein`).
 
 - **style**: always the world's style; generation is refused while it is
   empty. New worlds can start from a preset (`STYLES` in `prompt_manager.py`).
   The `ligne_claire_lineart` preset, kept word for word, also swaps in line-only
   framing for locations and final frames.
-- **assets**: always landscape (16:9) and high quality. Several renders (regenerate all) run one after another; if one fails, the
+- **assets**: characters and objects landscape (16:9), locations a 3:1 panorama, always high quality. Several renders (regenerate all) run one after another; if one fails, the
   ones already made are kept and the failure comes back as a `warning`.
-- **final frames**: the shot endpoint, with `{"provider": "openai" | "gemini" | "runware"}`
+- **final frames**: the shot endpoint, with `{"provider": "nano-banana"}` (any of the models)
   (the episode's last one when left out), renders the shot's finished, fully
   detailed frame at 1K (1360×768 landscape, the size of the 768p video it becomes) in the episode's
-  aspect ratio, with OpenAI at medium quality. It is sent the image of every character
+  aspect ratio, with the GPT models at medium quality. It is sent the image of every character
   and object tagged on the shot and every location tagged on its scene (as designs to reproduce,
   which with the world's style decide the look), plus their descriptions and the shot's text
   (the scene's heading and summary, and the shot's action; not its dialogue).

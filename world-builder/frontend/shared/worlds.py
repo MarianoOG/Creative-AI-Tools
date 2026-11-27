@@ -34,7 +34,7 @@ def render_world_switcher() -> Tuple[str, Dict]:
 
 
 def model_select(options: Dict, key: str, default: str = "") -> str:
-    """The provider picker: one model renders each image."""
+    """The model picker: one model (all through Runware) renders each image."""
     providers = list(options['providers'])
     current = default if default in providers else options['default_provider']
     return st.selectbox(
