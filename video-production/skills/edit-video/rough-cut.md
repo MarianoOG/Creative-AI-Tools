@@ -42,4 +42,4 @@ Render about 30 s of cleaned audio and have the user listen before calling it do
 
 ## 6. Hand back
 
-Save a new file per version (`<project>-rough-vN.mlt`) and add to `notes.md`: the outline table, pending inserts, the audio chain settings, the candidate short moments and the open decisions. Once the user approves the draft, continue with step 3 of `SKILL.md`.
+Save a new file per version (`<project>-rough-vN.mlt`) and keep everything in the project: the outline as chapter markers, pending inserts as INSERT placeholder clips, the candidate short moments as markers in their own colour. The audio chain is already in the project's filters. Tell the user the open decisions in chat. Once the user approves the draft, continue with step 3 of `SKILL.md`.

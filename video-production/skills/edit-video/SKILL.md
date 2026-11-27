@@ -18,7 +18,7 @@ Read the file each step names, in this skill's folder:
 
 ## Ground rules
 
-- **Install nothing.** Use what's already there: `ffmpeg`/`ffprobe`, the Shotcut snap (`shotcut.melt` renders projects), Node 22, Python 3, and the cached headless Chrome at `~/.cache/puppeteer/chrome-headless-shell/linux-*/chrome-headless-shell-linux64/chrome-headless-shell`. If a step really needs something new (a transcription model, for example), stop and ask first. Never use an unofficial mirror without asking.
+- **Install nothing.** Use what's already installed: `ffmpeg`/`ffprobe`, Shotcut's `melt` renderer (it renders projects), Node 22, Python 3 and a headless Chrome. If a step really needs something new (a transcription model, for example), stop and ask first. Never use an unofficial mirror without asking.
 - **Shotcut 26.06 or newer is assumed.** If a step needs something newer, tell the user so they can upgrade.
 - **Never modify or delete the originals.** Move them into the source folder unchanged.
 - **Every deliverable has a Shotcut project** (`.mlt`) that renders exactly what was published. Render with melt from that project, never with a separate ffmpeg pipeline the project doesn't reflect.
@@ -32,11 +32,7 @@ A source gives one long-form video and as many short-form videos as needed. Each
 
 By default a request produces **one** video: just define which one. The user can ask for more, or direct a different way of editing it.
 
-| | Long-form (landscape) | Short-form (vertical) |
-|---|---|---|
-| Frame | 1920×1080, 16:9 | 1080×1920, 9:16 |
-| Subtitles | Sidecar `.srt` (burned in only on request) | Burned in, always |
-| File | `<project>-long-16x9.mp4` | `<project>-short-<name>-9x16.mp4` |
+Frame, subtitles and the rest of each kind's specs are in `formats.md`. Files are named `<project>-long-16x9.mp4` and `<project>-short-<name>-9x16.mp4`.
 
 One short-form file serves every vertical platform. Don't make per-platform variants unless the user asks.
 
@@ -47,11 +43,11 @@ One short-form file serves every vertical platform. Don't make per-platform vari
 Inside the project folder (e.g. `~/Videos/<Project>/`). If the project already has its own layout, keep it and tell the user how it maps to this one.
 
 - `01 Source/`: originals, unchanged.
-- `02 Edit/`: one `.mlt` per deliverable and version, the `.srt` files, `Transcripts/` (.txt and .srt per clip) and a short `notes.md`. Variants (motion graphics, comparisons) get a subfolder each.
+- `02 Edit/`: one `.mlt` per deliverable and version, the `.srt` files and `Transcripts/` (.txt and .srt per clip). Variants (motion graphics, comparisons) get a subfolder each.
 - `03 Publish/`: **only the final video files.** No `.mlt`, `.srt`, notes or post texts.
 - `_claude_scratch/`: anything temporary, deletable at the end.
 
-Shotcut projects use absolute paths. After moving anything, rewrite the paths in every `.mlt` and re-render a few seconds of each project to prove it still finds its files. Never leave renders or projects in the scratchpad: the Shotcut snap can't see `/tmp`.
+Shotcut projects use absolute paths. After moving anything, rewrite the paths in every `.mlt` and re-render a few seconds of each project to prove it still finds its files. Never leave renders or projects in a temporary folder: Shotcut may not be able to open them there.
 
 ## Workflow
 

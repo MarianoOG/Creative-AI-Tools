@@ -5,7 +5,7 @@ description: "Checks a planned YouTube video title (or search phrase) against wh
 
 # YouTube title check
 
-Read `youtube-scout:foundations` → `youtube.md` (running `yt`, quota, data rules) first and pick the channel per its standing rules. Budget: **≤ 320 units** (up to 3 phrasings). Say the estimate before starting.
+Read `youtube-scout:foundations` → `youtube.md` (running `yt`, quota, data rules) first and pick the channel per its standing rules. Budget: the one in the quota table of `youtube.md`. Say the estimate before starting.
 
 ## Inputs
 

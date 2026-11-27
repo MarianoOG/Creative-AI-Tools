@@ -7,7 +7,7 @@ This skill holds the facts the other youtube-scout skills share. **Change a rule
 
 | File | Answers | Used by |
 |---|---|---|
-| `youtube.md` | Running `yt`, the API key, commands and units, quota budget per skill, data rules | youtube-keywords, youtube-next-video, youtube-collaborators, youtube-title-check |
+| `youtube.md` | Running `yt`, the API key, quota budget per skill, data rules | youtube-keywords, youtube-next-video, youtube-collaborators, youtube-title-check |
 
 ## Standing rules (every youtube-scout skill)
 
