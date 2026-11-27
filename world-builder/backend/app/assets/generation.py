@@ -1,4 +1,4 @@
-"""Image generation, all through Runware: OpenAI GPT-Image-2.6 (Sunburst or Flare), Google Nano Banana 2.1 or Flux 2 Klein 4B.
+"""Image generation, all through Runware: OpenAI GPT-Image-2.6 (Sunburst or Flare), Google Nano Banana 2.1, or Black Forest Labs FLUX 3 Image or FLUX 3 Image Klein.
 
 One model renders each image. Every model is reached with the one Runware key
 and the same ``imageInference`` task; only the fields a model takes differ.
@@ -44,18 +44,25 @@ MODELS: Dict[str, Dict[str, Any]] = {
         "air": "google:nano-banana@2.1", "family": "nano-banana",
         "label": "Nano Banana 2.1 (~$0.03-0.05/image)", "max_references": 14,
     },
-    "flux-klein": {
-        "air": "runware:400@4", "family": "flux",
-        "label": "Flux 2 Klein 4B (cheap and fast, ~$0.015/image)", "max_references": 4,
+    "flux-3": {
+        "air": "bfl:flux@3-image", "family": "flux-3",
+        "label": "FLUX 3 Image (~$0.05-0.10/image)", "max_references": 10,
+    },
+    "flux-3-klein": {
+        "air": "bfl:flux@3-image-klein", "family": "flux-3-klein",
+        "label": "FLUX 3 Image Klein (cheapest and fast, ~$0.003-0.02/image)", "max_references": 4,
     },
 }
 #: The name each model shows in the forms.
 PROVIDERS = {key: model["label"] for key, model in MODELS.items()}
 DEFAULT_PROVIDER = "gpt-image-sunburst"
 #: What episodes and variations made before everything went through Runware called their model.
-LEGACY_PROVIDERS = {"openai": "gpt-image-sunburst", "gemini": "nano-banana", "runware": "flux-klein"}
+LEGACY_PROVIDERS = {
+    "openai": "gpt-image-sunburst", "gemini": "nano-banana", "runware": "flux-3-klein", "flux-klein": "flux-3-klein",
+}
 #: Rough USD per final frame (1K), shown on the Storyboard until the world's cost log has real ones.
-PRICE_ESTIMATES = {"gpt-image-sunburst": 0.07, "gpt-image-flare": 0.17, "nano-banana": 0.034, "flux-klein": 0.007}
+PRICE_ESTIMATES = {"gpt-image-sunburst": 0.07, "gpt-image-flare": 0.17, "nano-banana": 0.034, "flux-3": 0.048,
+                   "flux-3-klein": 0.004}
 #: The models a final frame can use (all of them), and the default one.
 FINAL_PROVIDERS = tuple(PROVIDERS)
 DEFAULT_FINAL_PROVIDER = "nano-banana"
@@ -72,7 +79,8 @@ PANORAMA = "panorama"
 
 #: Model family -> resolution -> ratio -> (width, height). The GPT models take any size (sides
 #: divisible by 16, 1:3 to 3:1); Nano Banana only the sizes its table lists, and no 3:1 (its
-#: panorama is 21:9); Flux 2 Klein stays within 2048 a side. 1K matches the 768p video.
+#: panorama is 21:9); FLUX 3 Image likewise (its presets, 21:9 panorama); FLUX 3 Klein takes
+#: any size up to 4096 a side (multiples of 16). 1K matches the 768p video.
 SIZES: Dict[str, Dict[str, Dict[str, tuple[int, int]]]] = {
     "gpt": {
         "2K": {"16:9": (2048, 1152), "1:1": (2048, 2048), "9:16": (1152, 2048), "3:1": (3072, 1024)},
@@ -82,13 +90,17 @@ SIZES: Dict[str, Dict[str, Dict[str, tuple[int, int]]]] = {
         "2K": {"16:9": (2752, 1536), "1:1": (2048, 2048), "9:16": (1536, 2752), "3:1": (3168, 1344)},
         "1K": {"16:9": (1376, 768), "1:1": (1024, 1024), "9:16": (768, 1376)},
     },
-    "flux": {
-        "2K": {"16:9": (2048, 1152), "1:1": (2048, 2048), "9:16": (1152, 2048), "3:1": (2048, 688)},
+    "flux-3": {
+        "2K": {"16:9": (2736, 1536), "1:1": (2048, 2048), "9:16": (1536, 2736), "3:1": (3136, 1344)},
+        "1K": {"16:9": (1360, 768), "1:1": (1024, 1024), "9:16": (768, 1360)},
+    },
+    "flux-3-klein": {
+        "2K": {"16:9": (2048, 1152), "1:1": (2048, 2048), "9:16": (1152, 2048), "3:1": (3072, 1024)},
         "1K": {"16:9": (1360, 768), "1:1": (1024, 1024), "9:16": (768, 1360)},
     },
 }
 
-#: Quality -> (GPT ``settings.quality``, Nano Banana ``settings.thinkingLevel``). Flux has no quality setting.
+#: Quality -> (GPT ``settings.quality``, Nano Banana ``settings.thinkingLevel``). FLUX 3 has no quality setting.
 QUALITY: dict[str, tuple[str, Optional[str]]] = {
     "low": ("low", None),
     "medium": ("medium", None),
@@ -157,8 +169,7 @@ def runware_task(provider: str, prompt: str, size: tuple[int, int], quality: str
     elif model["family"] == "nano-banana":
         if thinking_level:
             task["settings"] = {"thinkingLevel": thinking_level}
-    else:
-        task.update({"steps": 4, "CFGScale": 3.5, "acceleration": "high"})
+    # FLUX 3 takes no quality setting: Klein runs its default 16 steps, FLUX 3 Image has no steps at all.
     if references:
         task["inputs"] = {"referenceImages": list(references)}
     return task

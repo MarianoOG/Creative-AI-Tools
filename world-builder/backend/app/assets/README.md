@@ -3,8 +3,9 @@
 Four kinds of image, each rendered by one model, always in the world's style.
 Every model goes through Runware with one key: OpenAI GPT-Image-2.6 Sunburst
 (`gpt-image-sunburst`) or Flare (`gpt-image-flare`), Google Nano Banana 2.1
-(`nano-banana`) or Flux 2 Klein 4B (`flux-klein`). Files from before keep the
-older names (`openai`, `gemini`, `runware`); they are read as those models.
+(`nano-banana`), or FLUX 3 Image (`flux-3`) or FLUX 3 Image Klein (`flux-3-klein`).
+Files from before keep the older names (`openai`, `gemini`, `runware`,
+`flux-klein`); they are read as those models (Flux 2 Klein as FLUX 3 Klein).
 
 
 | Type | What it renders | References are treated as |
@@ -23,7 +24,7 @@ first one made, until another is picked):
   preferred image, as the design to keep, plus what the variation says changes.
 - A location works the same way, except that its first image is always its
   `panorama`: one wide 3:1 image of the whole place (3072×1024 with the GPT
-  models; 21:9 with Nano Banana, which has no 3:1), drawn from the description,
+  models and FLUX 3 Klein; 21:9 with Nano Banana and FLUX 3 Image, which have no 3:1), drawn from the description,
   with its details spread across the full width so a final frame can be framed
   on any part of it. Its other variations are named and described freely
   (night, after the storm...), drawn from that first image as the same empty
@@ -190,7 +191,7 @@ changes its description or picks its preferred variation. `POST
 /assets/variations` (any asset; a location's first is its panorama), `POST /assets/regenerate` and
 `POST /worlds/{world}/episodes/{episode}/shots/{shot}/generate`
 wait for the render and return the result. Each image is rendered by one
-`provider` (`gpt-image-sunburst`, `gpt-image-flare`, `nano-banana` or `flux-klein`).
+`provider` (`gpt-image-sunburst`, `gpt-image-flare`, `nano-banana`, `flux-3` or `flux-3-klein`).
 
 - **style**: always the world's style; generation is refused while it is
   empty. New worlds can start from a preset (`STYLES` in `prompt_manager.py`).

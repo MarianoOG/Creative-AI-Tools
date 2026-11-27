@@ -36,13 +36,17 @@ def test_tasks_per_model():
     assert nano["model"] == "google:nano-banana@2.1" and (nano["width"], nano["height"]) == (1376, 768)
     assert nano["settings"] == {"thinkingLevel": "high"}
 
-    flux = runware_task("flux-klein", "a forest", image_size("flux-klein", "panorama", "2K"), "high")
-    assert flux["steps"] == 4 and "settings" not in flux and max(flux["width"], flux["height"]) <= 2048
+    klein = runware_task("flux-3-klein", "a forest", image_size("flux-3-klein", "panorama", "2K"), "high")
+    assert klein["model"] == "bfl:flux@3-image-klein" and (klein["width"], klein["height"]) == (3072, 1024)
+    assert "settings" not in klein and "steps" not in klein
+
+    flux = runware_task("flux-3", "a forest", image_size("flux-3", "landscape", "2K"), "high")
+    assert flux["model"] == "bfl:flux@3-image" and (flux["width"], flux["height"]) == (2736, 1536)
 
 
 def test_older_model_names_are_translated():
-    assert [model_key(name) for name in ("openai", "gemini", "runware", "nano-banana", None)] == [
-        "gpt-image-sunburst", "nano-banana", "flux-klein", "nano-banana", None,
+    assert [model_key(name) for name in ("openai", "gemini", "runware", "flux-klein", "nano-banana", None)] == [
+        "gpt-image-sunburst", "nano-banana", "flux-3-klein", "flux-3-klein", "nano-banana", None,
     ]
 
 
