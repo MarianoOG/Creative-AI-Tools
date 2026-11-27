@@ -1,0 +1,7 @@
+{
+  "name": "video-production",
+  "description": "Edit a video into a long-form (16:9) and a short-form (9:16) deliverable with a Shotcut project behind each: rough cut from raw footage, subtitles, safe areas, export and render checks.",
+  "author": {
+    "name": "MarianoOG"
+  }
+}
